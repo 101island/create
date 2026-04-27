@@ -1,0 +1,23 @@
+Use these names everywhere:
+
+MainThruster
+LeftThruster
+RightThruster
+Airspeed
+Rudder1
+
+Control hub config.lua:
+nodes = {
+    MainThruster = <main thruster turtle ID>,
+    LeftThruster = <left thruster turtle ID>,
+    RightThruster = <right thruster turtle ID>,
+    Airspeed = <airspeed turtle ID>,
+    Rudder1 = <rudder turtle ID>
+}
+
+Actuator node config.lua:
+components = {
+    MainThruster = "top"
+}
+
+Use the matching component name for each turtle.
