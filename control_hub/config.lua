@@ -7,6 +7,7 @@ return {
         LeftThruster = 4,
         RightThruster = 5,
         Airspeed = 2,
+        GNSS = 32,
         Rudder1 = 6
     }
 }

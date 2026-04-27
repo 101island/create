@@ -5,18 +5,11 @@ actuator.lua
 rpc.lua
 config.lua
 
-Edit config.lua if your modem or motor side is different.
+Edit config.lua only. It is the single config file for this node.
 
 Default:
 modemSide = right
-MainThruster = top
+MainThruster = back
 
 Run:
-actuator_node
-
-Config templates:
-config_main_thruster.lua
-config_left_thruster.lua
-config_right_thruster.lua
-
-Rename the matching template to config.lua on each turtle.
+actuator_node.lua

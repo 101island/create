@@ -121,8 +121,8 @@ end
 ------------------------------------------------
 if not args[1] then
     print("Usage:")
-    print("inspect <side>")
-    print("inspect <side> <method> <arg1> ...")
+    print("inspect.lua <side>")
+    print("inspect.lua <side> <method> <arg1> ...")
     return
 end
 
@@ -235,5 +235,5 @@ end
 
 println("")
 c(colors.gray)
-println("Tip: inspect "..side.." <method> <arg1> ...")
+println("Tip: inspect.lua "..side.." <method> <arg1> ...")
 reset()

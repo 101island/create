@@ -31,19 +31,30 @@ function M.resolveTarget(cfg, msg)
         target = msg.target
     end
 
-    for name, spec in pairs(cfg.sensors or {}) do
-        if target == name or target == spec.side then
-            return name
-        end
-
-        for _, alias in ipairs(spec.aliases or {}) do
-            if target == alias then
-                return name
-            end
-        end
+    if type(target) == "string" and cfg.sensors and cfg.sensors[target] then
+        return target
     end
 
     return nil, "Unknown target [" .. tostring(target) .. "]"
+end
+
+function M.sensorNames(cfg)
+    local names = {}
+
+    if type(cfg.sensorOrder) == "table" then
+        for _, name in ipairs(cfg.sensorOrder) do
+            if cfg.sensors and cfg.sensors[name] then
+                names[#names + 1] = name
+            end
+        end
+        return names
+    end
+
+    for name in pairs(cfg.sensors or {}) do
+        names[#names + 1] = name
+    end
+    table.sort(names)
+    return names
 end
 
 function M.read(cfg, sensorName)
@@ -58,6 +69,22 @@ function M.read(cfg, sensorName)
     end
 
     return M.readAxis(sensor, spec.axis, spec.index)
+end
+
+function M.readAll(cfg)
+    local result = {
+        order = M.sensorNames(cfg)
+    }
+
+    for _, name in ipairs(result.order) do
+        local value, err = M.read(cfg, name)
+        result[name] = value
+        if err then
+            result[name .. "Err"] = err
+        end
+    end
+
+    return result
 end
 
 return M

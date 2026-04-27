@@ -45,16 +45,28 @@ function M.readAirspeed()
         return nil, err
     end
 
-    local forward, forwardErr = M.call(nodeID, "bottom", "get", {}, 5)
-    local vertical, verticalErr = M.call(nodeID, "left", "get", {}, 5)
+    local result, readErr = M.call(nodeID, "airspeed", "readAll", {}, 5)
+    if type(result) ~= "table" then
+        return nil, readErr
+    end
 
-    return {
-        nodeID = nodeID,
-        forward = forward,
-        forwardErr = forwardErr,
-        vertical = vertical,
-        verticalErr = verticalErr
-    }
+    result.nodeID = nodeID
+    return result
+end
+
+function M.readGnss()
+    local nodeID, err = M.nodeID("GNSS")
+    if not nodeID then
+        return nil, err
+    end
+
+    local result, readErr = M.call(nodeID, "gnss", "readAll", {}, 5)
+    if type(result) ~= "table" then
+        return nil, readErr
+    end
+
+    result.nodeID = nodeID
+    return result
 end
 
 return M

@@ -1,27 +1,16 @@
 local client = dofile("client.lua")
 local cfg = client.config()
 
-local airspeedID = cfg.nodes and cfg.nodes.Airspeed
+local gnssID = cfg.nodes and cfg.nodes.GNSS
 
-print("Target ID: " .. tostring(airspeedID))
+print("Target ID: " .. tostring(gnssID))
 print("Protocol: " .. tostring(cfg.protocol))
 print("Modem: " .. tostring(cfg.modemSide))
 
-local result, err = client.readAirspeed()
+local result, err = client.readGnss()
 if not result then
     print("ERROR: " .. tostring(err))
     return
-end
-
-local function valueOrError(value, errorValue)
-    if value == nil then
-        return errorValue
-    end
-    return value
-end
-
-local function label(name)
-    return name:sub(1, 1):upper() .. name:sub(2)
 end
 
 local order = result.order or {}
@@ -35,5 +24,5 @@ if #order == 0 then
 end
 
 for _, name in ipairs(order) do
-    print(label(name) .. ": " .. tostring(valueOrError(result[name], result[name .. "Err"])))
+    print(name .. ": " .. tostring(result[name]))
 end

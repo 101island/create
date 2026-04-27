@@ -1,19 +1,18 @@
 return {
     protocol = "aero_control",
     modemSide = "right",
+    sensorOrder = { "forward", "down" },
 
     sensors = {
         forward = {
-            side = "bottom",
+            side = "top",
             axis = "x",
-            index = 1,
-            aliases = { "bottom", "forward" }
+            index = 1
         },
-        vertical = {
+        down = {
             side = "left",
             axis = "y",
-            index = 2,
-            aliases = { "left", "back", "vertical" }
+            index = 2
         }
     }
 }

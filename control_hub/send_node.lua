@@ -2,10 +2,10 @@ local args = {...}
 local client = dofile("client.lua")
 
 if #args < 2 then
-    print("Usage: send_node <nodeName> <rpm>")
-    print("   or: send_node <nodeName> <targetAlias> <rpm>")
-    print("Example: send_node RightThruster 100")
-    print("Example: send_node RightThruster RightThruster 100")
+    print("Usage: send_node.lua <nodeName> <rpm>")
+    print("   or: send_node.lua <nodeName> <targetAlias> <rpm>")
+    print("Example: send_node.lua RightThruster 100")
+    print("Example: send_node.lua RightThruster RightThruster 100")
     return
 end
 

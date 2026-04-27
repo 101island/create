@@ -2,8 +2,8 @@ local args = {...}
 local client = dofile("client.lua")
 
 if #args < 3 then
-    print("Usage: send_actuator <nodeID> <alias> <rpm>")
-    print("Example: send_actuator 3 MainThruster 100")
+    print("Usage: send_actuator.lua <nodeID> <alias> <rpm>")
+    print("Example: send_actuator.lua 3 MainThruster 100")
     return
 end
 

@@ -7,9 +7,9 @@ rpc.lua
 
 Default:
 modemSide = right
-bottom = forward speed
-left = vertical speed
+forward request = top side
+down request = left side
 protocol = aero_control
 
 Run:
-airspeed_node
+airspeed_node.lua
