@@ -1,5 +1,5 @@
 local M = {}
-local pwmCounters = {}
+local pwmErrors = {}
 
 local function clamp(value, minValue, maxValue)
     if minValue ~= nil and value < minValue then
@@ -20,13 +20,14 @@ local function quantize(alias, value, window)
     end
 
     local fraction = value - lower
-    local upperTicks = math.floor(fraction * window + 0.5)
-    local counter = (pwmCounters[alias] or 0) % window
-    pwmCounters[alias] = (counter + 1) % window
+    local error = (pwmErrors[alias] or 0) + fraction
 
-    if counter < upperTicks then
+    if error >= 1 then
+        pwmErrors[alias] = error - 1
         return upper
     end
+
+    pwmErrors[alias] = error
     return lower
 end
 
