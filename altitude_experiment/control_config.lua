@@ -50,9 +50,9 @@ return {
             }
         },
         outerPid = {
-            kp = 1.0,
-            ki = 0,
-            kd = 0,
+            kp = 0.3,
+            ki = 0.03,
+            kd = 0.01,
             bias = 0,
             outputMin = -20,
             outputMax = 20,
@@ -67,9 +67,9 @@ return {
             }
         },
         innerPid = {
-            kp = 1.0,
-            ki = 0,
-            kd = 0,
+            kp = 0.3,
+            ki = 0.02,
+            kd = 0.01,
             -- Inner PID output is a signed correction added on top of feedforward.
             bias = 0,
             outputMin = -7,
