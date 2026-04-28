@@ -15,7 +15,7 @@ return {
 
     display = {
         side = "top",
-        remoteName = "monitor_0"
+        remoteName = "monitor_1"
     },
 
     components = {
