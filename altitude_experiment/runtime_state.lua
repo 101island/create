@@ -6,11 +6,11 @@ local feedforward = dofile("feedforward.lua")
 local M = {}
 
 local function nowSeconds()
-    if type(os) == "table" and type(os.epoch) == "function" then
-        return os.epoch("utc") / 1000
-    end
     if type(os) == "table" and type(os.clock) == "function" then
         return os.clock()
+    end
+    if type(os) == "table" and type(os.epoch) == "function" then
+        return os.epoch("ingame") / 72000
     end
     return nil
 end
