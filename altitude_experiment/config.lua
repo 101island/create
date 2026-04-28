@@ -23,14 +23,12 @@ return {
             -- redstone_relay analog output: 0..15.
             -- Normal mapping: output = command * 1 + 0.
             -- Inverted 0..15 mapping: output = command * -1 + 15.
-            -- pwmWindow > 1 dithers fractional commands across ticks.
             peripheralType = "redstone_relay",
             outputSide = "left",
             scale = 1,
             bias = 0,
             outputMin = 0,
-            outputMax = 15,
-            pwmWindow = 5
+            outputMax = 15
         }
     }
 }

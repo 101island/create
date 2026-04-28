@@ -11,11 +11,11 @@ local function clamp(value, minValue, maxValue)
     return value
 end
 
-local function quantize(alias, value, window)
+local function quantize(alias, value)
     local lower = math.floor(value)
     local upper = math.ceil(value)
 
-    if lower == upper or window <= 1 then
+    if lower == upper then
         return math.floor(value + 0.5)
     end
 
@@ -78,9 +78,8 @@ function M.setOutput(cfg, alias, command)
     local outputMin = tonumber(spec.outputMin) or 0
     local outputMax = tonumber(spec.outputMax) or 15
     local outputSide = spec.outputSide or "left"
-    local pwmWindow = tonumber(spec.pwmWindow) or 1
     local level = clamp(value * scale + bias, outputMin, outputMax)
-    local quantizedLevel = quantize(alias, level, pwmWindow)
+    local quantizedLevel = quantize(alias, level)
     device.setAnalogOutput(outputSide, quantizedLevel)
 
     return {

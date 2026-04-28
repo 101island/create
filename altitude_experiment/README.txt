@@ -55,10 +55,6 @@ components.TopThruster.bias:
   Normal 0..15 mapping: scale = 1, bias = 0.
   Inverted 0..15 mapping: scale = -1, bias = 15.
 
-components.TopThruster.pwmWindow:
-  Integer output dithering window for fractional commands. 5 follows the
-  reference pid.lua script.
-
 Control config:
 control_config.lua
 
