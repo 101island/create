@@ -429,7 +429,7 @@ function M.step(runtime, options)
 
     if runtime.mode == "cascade" then
         if runtime.enabled then
-            speedTarget, outerInfo = pid.update(runtime.outerPid, runtime.setpoints.altitude, position, dt)
+            speedTarget, outerInfo = pid.update(runtime.outerPid, runtime.setpoints.altitude, position, dt, type(speed) == "number" and -speed or nil)
             outerErr = type(outerInfo) == "string" and outerInfo or nil
         else
             outerInfo = {

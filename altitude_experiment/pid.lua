@@ -32,10 +32,11 @@ function M.reset(state)
     state.previousError = nil
 end
 
-function M.update(state, setpoint, measurement, dt)
+function M.update(state, setpoint, measurement, dt, derivative)
     if type(state) ~= "table" then
         return nil, "Missing PID state"
     end
+
     local elapsed = tonumber(dt)
     if elapsed == nil or elapsed <= 0 then
         return nil, "Invalid dt"
@@ -57,9 +58,12 @@ function M.update(state, setpoint, measurement, dt)
         state.integralMax
     )
 
-    local derivative = 0
-    if state.previousError ~= nil then
-        derivative = (errorValue - state.previousError) / elapsed
+    local derivativeValue = tonumber(derivative)
+    if derivativeValue == nil then
+        derivativeValue = 0
+        if state.previousError ~= nil then
+            derivativeValue = (errorValue - state.previousError) / elapsed
+        end
     end
     state.previousError = errorValue
 
@@ -67,14 +71,14 @@ function M.update(state, setpoint, measurement, dt)
         state.bias +
         state.kp * errorValue +
         state.ki * state.integral +
-        state.kd * derivative
+        state.kd * derivativeValue
 
     output = clamp(output, state.outputMin, state.outputMax)
 
     return output, {
         error = errorValue,
         integral = state.integral,
-        derivative = derivative
+        derivative = derivativeValue
     }
 end
 
