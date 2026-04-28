@@ -2,10 +2,23 @@ return {
     forwardSpeed = {
         setpoint = 0,
         period = 0.2,
-        output = {
-            node = "MainThruster",
-            alias = "MainThruster",
-            maxStep = 16
+        maxStep = 16,
+        outputs = {
+            {
+                node = "MainThruster",
+                alias = "MainThruster",
+                ratio = 1
+            },
+            {
+                node = "LeftThruster",
+                alias = "LeftThruster",
+                ratio = 1
+            },
+            {
+                node = "RightThruster",
+                alias = "RightThruster",
+                ratio = 1
+            }
         },
         pid = {
             kp = 1.5,
@@ -25,8 +38,7 @@ return {
                 {
                     key = "speed",
                     label = "Speed",
-                    source = "forward",
-                    target = 0
+                    source = "forward"
                 },
                 {
                     key = "height",

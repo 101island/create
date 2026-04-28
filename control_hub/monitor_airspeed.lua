@@ -10,6 +10,7 @@ local function loadDisplay(name)
 end
 
 local client = dofile("client.lua")
+local controlCfg = dofile("control_config.lua")
 local core = loadDisplay("core")
 local device = loadDisplay("device")
 local airspeed = loadDisplay("airspeed")
@@ -67,10 +68,35 @@ local cfg = client.config()
 local targetID = cfg.nodes and cfg.nodes.Airspeed
 local status = "ID " .. tostring(targetID) .. "  " .. tostring(period) .. "s"
 
+local function buildMetricState(data)
+    local forwardTarget = controlCfg.forwardSpeed and controlCfg.forwardSpeed.setpoint
+
+    return {
+        metrics = {
+            {
+                key = "speed",
+                label = "Speed",
+                source = "forward",
+                current = data and data.forward or nil,
+                currentErr = data and data.forwardErr or nil,
+                target = forwardTarget
+            },
+            {
+                key = "vertical",
+                label = "Vertical",
+                source = "down",
+                current = data and data.down or nil,
+                currentErr = data and data.downErr or nil,
+                target = nil
+            }
+        }
+    }
+end
+
 while true do
     local data, err = client.readAirspeed()
     if data then
-        airspeed.draw(screen, data, status)
+        airspeed.draw(screen, buildMetricState(data), status)
     else
         airspeed.drawError(screen, err or "No data", status)
     end

@@ -25,7 +25,7 @@ CC_Airship 是一组 Lua 脚本，用于通过 `rednet` 在控制端、测速节
 | `control_hub/` | 从控制端向其他节点发送 RPC 消息，读取测速数据、GNSS 数据、显示测速数显、设置执行器转速，运行前行速度控制环。 | `config.lua`, `client.lua`, `display/`, `control_config.lua`, `pid.lua`, `rpc.lua`, `read_airspeed.lua`, `read_gnss.lua`, `monitor_airspeed.lua`, `display_dashboard.lua`, `show_flight_display.lua`, `send_actuator.lua`, `send_node.lua`, `run_forward_speed.lua` |
 | `airspeed_node/` | 监听测速请求，读取配置中定义的测速外设并返回速度值。 | `airspeed_node.lua`, `airspeed.lua`, `config.lua`, `rpc.lua` |
 | `gnss/` | 监听 GNSS 请求，读取 GPS 定位并返回 `x/y/z/altitude`。 | `gnss_node.lua`, `gnss.lua`, `config.lua`, `rpc.lua` |
-| `actuator_node/` | 监听执行器控制请求，调用外设的 `setSpeed` 或 `stop` 方法。 | `actuator_node.lua`, `actuator.lua`, `rpc.lua`, `config.lua` |
+| `actuator_node/` | 监听执行器控制请求，调用外设的 `setSpeed`、`setGeneratedSpeed` 或 `stop` 方法。 | `actuator_node.lua`, `actuator.lua`, `rpc.lua`, `config.lua` |
 | `common/` | 公共模块源码。需要部署到节点目录的副本可通过 `tools/sync_common.ps1` 同步。 | `rpc.lua`, `actuator.lua`, `airspeed.lua`, `gnss.lua`, `pid.lua`, `inspect.lua` |
 | `display/` | 显示终端模块源码，负责获取显示用数据、刷新显示屏、绘制页面和处理显示菜单。需要部署到中控的副本可通过 `tools/sync_common.ps1` 同步。 | `device.lua`, `core.lua`, `menu.lua`, `plot.lua`, `airspeed.lua`, `flight.lua` |
 | `tools/` | 项目维护脚本。 | `sync_common.ps1` |
@@ -101,7 +101,10 @@ nodes = {
 
 ```lua
 components = {
-    MainThruster = "back"
+    MainThruster = {
+        side = "left",
+        scale = 1
+    }
 }
 ```
 
@@ -180,12 +183,14 @@ return {
         forward = {
             side = "top",
             axis = "x",
-            index = 1
+            index = 1,
+            scale = -1
         },
         down = {
             side = "left",
             axis = "y",
-            index = 2
+            index = 2,
+            scale = 1
         }
     }
 }
@@ -274,7 +279,14 @@ return {
         --
         -- Fill in the peripheral side of the motor:
         -- "left" / "right" / "top" / "bottom" / "front" / "back"
-        MainThruster = "back"
+        --
+        -- scale controls motor polarity:
+        -- 1 keeps the command direction
+        -- -1 reverses the command direction
+        MainThruster = {
+            side = "left",
+            scale = 1
+        }
     }
 }
 ```
@@ -320,6 +332,7 @@ monitor_airspeed.lua left 0.5 1
 - `period`：刷新周期，默认 `0.5` 秒。
 - `textScale`：文字缩放，默认 `1`。
 - 显示哪些测速通道由测速节点返回的 `sensorOrder` 决定；中控不重复配置通道列表。
+- `forward` 通道的目标值显示默认来自 `control_hub/control_config.lua` 中的 `forwardSpeed.setpoint`。
 
 3x3 显示屏仪表盘：
 
@@ -437,7 +450,7 @@ run_forward_speed.lua 20 1.5 0 0.1 0.2 --dry-run
 
 如果命令行不传数值参数，`run_forward_speed.lua` 会直接使用 `control_hub/control_config.lua` 中的 `forwardSpeed.setpoint`、`forwardSpeed.pid.kp`、`ki`、`kd` 和 `period`。
 
-当前前行速度环读取 `Airspeed` 节点的前向速度，并把 PID 输出发送到 `control_config.lua` 中配置的执行器。默认输出对象是 `MainThruster / MainThruster`。传感器读取失败时，默认发送 `0` 转速。
+当前前行速度环读取 `Airspeed` 节点的前向速度，并把一个基础 PID 输出量按固定比例分配到 `control_config.lua` 中配置的多个执行器。传感器读取失败时，默认向全部输出通道发送 `0` 转速。
 
 前行速度环配置示例：
 
@@ -446,10 +459,23 @@ return {
     forwardSpeed = {
         setpoint = 0,
         period = 0.2,
-        output = {
-            node = "MainThruster",
-            alias = "MainThruster",
-            maxStep = 16
+        maxStep = 16,
+        outputs = {
+            {
+                node = "MainThruster",
+                alias = "MainThruster",
+                ratio = 1
+            },
+            {
+                node = "LeftThruster",
+                alias = "LeftThruster",
+                ratio = 1
+            },
+            {
+                node = "RightThruster",
+                alias = "RightThruster",
+                ratio = 1
+            }
         },
         pid = {
             kp = 1.5,
@@ -484,7 +510,11 @@ return {
 }
 ```
 
-其中 `maxStep` 限制每个控制周期内输出转速的最大变化量。
+其中：
+
+- `maxStep` 限制每个控制周期内“基础输出量”的最大变化量。
+- `outputs` 定义参与前行速度环的执行器列表。
+- 每个输出项的 `ratio` 表示该执行器相对于基础输出量的固定比例。
 
 `display.dashboard.metrics` 定义 dashboard 要显示和绘制的量。每个条目都包含：
 
@@ -516,8 +546,9 @@ return {
 - `setSpeed(cfg, alias, rpm)` 会把 `rpm` 转成数字。
 - `rpm` 无法转成数字时返回 `Invalid RPM`。
 - `rpm` 会被限制在 `-256` 到 `256` 之间。
-- 外设必须支持 `setSpeed` 方法。
-- `stop(cfg, alias)` 会优先调用外设的 `stop` 方法；如果没有 `stop`，但有 `setSpeed`，则调用 `setSpeed(0)`。
+- `components.<alias>.scale` 可用于执行器极性调节；`1` 表示保持方向，`-1` 表示反向。
+- 外设必须支持 `setSpeed` 或 `setGeneratedSpeed` 方法之一。
+- `stop(cfg, alias)` 会优先调用外设的 `stop` 方法；如果没有 `stop`，但有 `setSpeed` 或 `setGeneratedSpeed`，则调用对应方法并写入 `0`。
 
 ## 测速节点行为
 
@@ -528,6 +559,7 @@ return {
 - 中控读取测速时只发送一次 `readAll` 请求；返回哪些通道由测速节点的 `sensors` 和 `sensorOrder` 决定。
 - 坐标命名采用前-右-下：`forward` 表示前向，`right` 表示右向，`down` 表示下向。
 - 当前默认配置未定义 `right` 通道；如需右向速度，需要在 `sensors` 表中增加 `right`。
+- 每个通道可通过 `scale` 配置极性和倍率；`-1` 表示反号，`1` 表示保持原值。
 - 测速外设必须存在并提供 `getVelocity` 方法。
 - 如果 `getVelocity()` 返回数字，则直接使用该数字。
 - 如果 `getVelocity()` 返回表，`forward` 读取 `x` 或第 1 项，`down` 读取 `y` 或第 2 项；没有对应值时返回 `0`。

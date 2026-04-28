@@ -7,12 +7,14 @@ return {
         forward = {
             side = "top",
             axis = "x",
-            index = 1
+            index = 1,
+            scale = -1
         },
         down = {
             side = "left",
             axis = "y",
-            index = 2
+            index = 2,
+            scale = 1
         }
     }
 }

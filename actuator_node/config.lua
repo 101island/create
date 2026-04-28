@@ -12,6 +12,13 @@ return {
         --
         -- Fill in the peripheral side of the motor:
         -- "left" / "right" / "top" / "bottom" / "front" / "back"
-        MainThruster = "back"
+        --
+        -- scale controls motor polarity:
+        -- 1 keeps the command direction
+        -- -1 reverses the command direction
+        MainThruster = {
+            side = "left",
+            scale = 1
+        }
     }
 }

@@ -68,7 +68,9 @@ function M.read(cfg, sensorName)
         return nil, err
     end
 
-    return M.readAxis(sensor, spec.axis, spec.index)
+    local value = M.readAxis(sensor, spec.axis, spec.index)
+    local scale = tonumber(spec.scale) or 1
+    return value * scale
 end
 
 function M.readAll(cfg)

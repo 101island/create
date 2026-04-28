@@ -9,7 +9,7 @@ if type(cfg) ~= "table" then
     return
 end
 
-local outputCfg = cfg.output or {}
+local outputsCfg = cfg.outputs or {}
 local pidCfg = cfg.pid or {}
 
 local values = {}
@@ -67,13 +67,28 @@ if period == nil or period <= 0 then
     print("ERROR: Invalid period.")
     return
 end
-if type(outputCfg.node) ~= "string" or outputCfg.node == "" then
-    print("ERROR: Missing output node.")
+if type(outputsCfg) ~= "table" or #outputsCfg == 0 then
+    print("ERROR: Missing forwardSpeed.outputs config.")
     return
 end
-if type(outputCfg.alias) ~= "string" or outputCfg.alias == "" then
-    print("ERROR: Missing output alias.")
-    return
+
+for index, item in ipairs(outputsCfg) do
+    if type(item) ~= "table" then
+        print("ERROR: Invalid output entry #" .. tostring(index) .. ".")
+        return
+    end
+    if type(item.node) ~= "string" or item.node == "" then
+        print("ERROR: Missing output node in entry #" .. tostring(index) .. ".")
+        return
+    end
+    if type(item.alias) ~= "string" or item.alias == "" then
+        print("ERROR: Missing output alias in entry #" .. tostring(index) .. ".")
+        return
+    end
+    if tonumber(item.ratio) == nil then
+        print("ERROR: Missing output ratio in entry #" .. tostring(index) .. ".")
+        return
+    end
 end
 if type(sleep) ~= "function" then
     print("ERROR: sleep() is not available in this runtime.")
@@ -102,7 +117,7 @@ local controller = pid.new({
 local lastOutput = nil
 
 local function limitStep(value)
-    local maxStep = tonumber(outputCfg.maxStep)
+    local maxStep = tonumber(cfg.maxStep)
     if not maxStep or not lastOutput then
         return value
     end
@@ -117,21 +132,64 @@ local function limitStep(value)
     return value
 end
 
-local function setOutput(rpm)
-    lastOutput = rpm
+local function buildCommands(baseRPM)
+    local commands = {}
 
-    if dryRun then
-        return rpm
+    for _, item in ipairs(outputsCfg) do
+        commands[#commands + 1] = {
+            node = item.node,
+            alias = item.alias,
+            ratio = tonumber(item.ratio) or 0,
+            rpm = baseRPM * (tonumber(item.ratio) or 0)
+        }
     end
 
-    return client.setNodeSpeed(outputCfg.node, outputCfg.alias, rpm)
+    return commands
+end
+
+local function describeCommands(commands)
+    local parts = {}
+
+    for _, item in ipairs(commands) do
+        parts[#parts + 1] = item.alias .. "=" .. tostring(item.rpm)
+    end
+
+    return table.concat(parts, "  ")
+end
+
+local function setOutputs(baseRPM)
+    lastOutput = baseRPM
+    local commands = buildCommands(baseRPM)
+
+    if dryRun then
+        return {
+            baseRPM = baseRPM,
+            commands = commands
+        }
+    end
+
+    for _, item in ipairs(commands) do
+        local value, err = client.setNodeSpeed(item.node, item.alias, item.rpm)
+        if value == nil then
+            return nil, item.alias .. ": " .. tostring(err)
+        end
+        item.actualRPM = value
+    end
+
+    return {
+        baseRPM = baseRPM,
+        commands = commands
+    }
 end
 
 print("Forward speed loop")
 print("Target: " .. tostring(setpoint))
 print("PID: kp=" .. tostring(kp) .. " ki=" .. tostring(ki) .. " kd=" .. tostring(kd))
 print("Period: " .. tostring(period))
-print("Output: " .. tostring(outputCfg.node) .. " / " .. tostring(outputCfg.alias))
+print("Outputs:")
+for _, item in ipairs(outputsCfg) do
+    print("  " .. tostring(item.node) .. " / " .. tostring(item.alias) .. "  ratio=" .. tostring(item.ratio))
+end
 print("Dry run: " .. tostring(dryRun))
 
 while true do
@@ -142,7 +200,7 @@ while true do
         print("ERROR: " .. tostring(err))
 
         if cfg.stopOnSensorError then
-            local _, stopErr = setOutput(0)
+            local _, stopErr = setOutputs(0)
             if stopErr then
                 print("STOP ERROR: " .. tostring(stopErr))
             end
@@ -153,16 +211,17 @@ while true do
             print("ERROR: " .. tostring(updateInfoOrErr))
         else
             local rpm = limitStep(rawOutput)
-            local value, err = setOutput(rpm)
+            local result, err = setOutputs(rpm)
 
-            if value == nil then
+            if result == nil then
                 print("OUTPUT ERROR: " .. tostring(err))
             else
                 print(
                     "forward=" .. tostring(airspeed.forward) ..
                     " target=" .. tostring(setpoint) ..
                     " error=" .. tostring(updateInfoOrErr.error) ..
-                    " rpm=" .. tostring(value)
+                    " base=" .. tostring(result.baseRPM) ..
+                    "  " .. describeCommands(result.commands)
                 )
             end
         end

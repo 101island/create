@@ -3,7 +3,7 @@ return {
     modemSide = "right",
 
     nodes = {
-        MainThruster = 3,
+        MainThruster = 42,
         LeftThruster = 4,
         RightThruster = 5,
         Airspeed = 2,

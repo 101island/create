@@ -1,5 +1,15 @@
 local M = {}
 
+local function findSpeedSetter(device)
+    if type(device.setSpeed) == "function" then
+        return device.setSpeed, "setSpeed"
+    end
+    if type(device.setGeneratedSpeed) == "function" then
+        return device.setGeneratedSpeed, "setGeneratedSpeed"
+    end
+    return nil, nil
+end
+
 function M.loadConfig(path)
     local ok, cfg = pcall(dofile, path or "config.lua")
     if not ok then
@@ -12,9 +22,14 @@ function M.loadConfig(path)
 end
 
 function M.wrap(cfg, alias)
-    local address = cfg.components[alias]
-    if not address then
+    local spec = cfg.components[alias]
+    if type(spec) ~= "table" then
         return nil, "Unknown alias [" .. tostring(alias) .. "]"
+    end
+
+    local address = spec.side
+    if type(address) ~= "string" or address == "" then
+        return nil, "Missing side for [" .. tostring(alias) .. "]"
     end
 
     local device = peripheral.wrap(address)
@@ -22,7 +37,7 @@ function M.wrap(cfg, alias)
         return nil, "Could not find [" .. alias .. "] at [" .. address .. "]"
     end
 
-    return device, nil, address
+    return device, nil, address, spec
 end
 
 function M.setSpeed(cfg, alias, rpm)
@@ -31,22 +46,25 @@ function M.setSpeed(cfg, alias, rpm)
         return nil, "Invalid RPM"
     end
 
-    local device, err, address = M.wrap(cfg, alias)
+    local device, err, address, spec = M.wrap(cfg, alias)
     if not device then
         return nil, err
     end
 
-    if type(device.setSpeed) ~= "function" then
-        return nil, "[" .. alias .. "] does not support setSpeed"
+    local setter, setterName = findSpeedSetter(device)
+    if not setter then
+        return nil, "[" .. alias .. "] does not support setSpeed or setGeneratedSpeed"
     end
 
-    local safeRPM = math.max(-256, math.min(256, value))
-    device.setSpeed(safeRPM)
+    local scale = tonumber(spec.scale) or 1
+    local safeRPM = math.max(-256, math.min(256, value * scale))
+    setter(safeRPM)
 
     return {
         alias = alias,
         address = address,
-        rpm = safeRPM
+        rpm = safeRPM,
+        method = setterName
     }
 end
 
@@ -56,12 +74,14 @@ function M.stop(cfg, alias)
         return nil, err
     end
 
+    local setter = findSpeedSetter(device)
+
     if type(device.stop) == "function" then
         device.stop()
-    elseif type(device.setSpeed) == "function" then
-        device.setSpeed(0)
+    elseif setter then
+        setter(0)
     else
-        return nil, "[" .. alias .. "] does not support stop or setSpeed"
+        return nil, "[" .. alias .. "] does not support stop, setSpeed, or setGeneratedSpeed"
     end
 
     return {
