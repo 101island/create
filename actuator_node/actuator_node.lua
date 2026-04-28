@@ -24,6 +24,10 @@ while true do
                 print("ERR: " .. tostring(err))
             end
 
+        elseif msg.method == "readAll" then
+            local result = actuator.readAll(cfg)
+            rpc.reply(sender, cfg.protocol, true, result)
+
         elseif msg.method == "stop" then
             local result, err = actuator.stop(cfg, msg.target)
 

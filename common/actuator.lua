@@ -10,6 +10,16 @@ local function findSpeedSetter(device)
     return nil, nil
 end
 
+local function findSpeedGetter(device)
+    if type(device.getSpeed) == "function" then
+        return device.getSpeed, "getSpeed"
+    end
+    if type(device.getGeneratedSpeed) == "function" then
+        return device.getGeneratedSpeed, "getGeneratedSpeed"
+    end
+    return nil, nil
+end
+
 function M.loadConfig(path)
     local ok, cfg = pcall(dofile, path or "config.lua")
     if not ok then
@@ -19,6 +29,15 @@ function M.loadConfig(path)
         return nil, "config.components is missing or invalid"
     end
     return cfg
+end
+
+function M.componentNames(cfg)
+    local names = {}
+    for name in pairs(cfg.components or {}) do
+        names[#names + 1] = name
+    end
+    table.sort(names)
+    return names
 end
 
 function M.wrap(cfg, alias)
@@ -89,6 +108,45 @@ function M.stop(cfg, alias)
         address = address,
         rpm = 0
     }
+end
+
+function M.read(cfg, alias)
+    local device, err, address = M.wrap(cfg, alias)
+    if not device then
+        return nil, err
+    end
+
+    local getter, getterName = findSpeedGetter(device)
+    if not getter then
+        return nil, "[" .. alias .. "] does not support getSpeed or getGeneratedSpeed"
+    end
+
+    local value = getter()
+    return {
+        alias = alias,
+        address = address,
+        rpm = value,
+        method = getterName
+    }
+end
+
+function M.readAll(cfg)
+    local result = {
+        order = M.componentNames(cfg)
+    }
+
+    for _, name in ipairs(result.order) do
+        local value, err = M.read(cfg, name)
+        if value then
+            result[name] = value.rpm
+            result[name .. "Method"] = value.method
+        else
+            result[name] = nil
+            result[name .. "Err"] = err
+        end
+    end
+
+    return result
 end
 
 return M

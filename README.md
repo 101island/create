@@ -9,6 +9,7 @@ CC_Airship 是一组 Lua 脚本，用于通过 `rednet` 在控制端、测速节
 ```text
 .
 ├── control_hub/       # 控制端脚本
+├── altitude_experiment/ # 高度串级实验电脑脚本
 ├── airspeed_node/     # 测速节点脚本
 ├── gnss/              # GNSS 节点脚本
 ├── actuator_node/     # 执行器节点脚本
@@ -22,12 +23,13 @@ CC_Airship 是一组 Lua 脚本，用于通过 `rednet` 在控制端、测速节
 
 | 目录 | 作用 | 主要文件 |
 | --- | --- | --- |
-| `control_hub/` | 从控制端向其他节点发送 RPC 消息，读取测速数据、GNSS 数据、显示测速数显、设置执行器转速，运行前行速度控制环。 | `config.lua`, `client.lua`, `display/`, `control_config.lua`, `pid.lua`, `rpc.lua`, `read_airspeed.lua`, `read_gnss.lua`, `monitor_airspeed.lua`, `display_dashboard.lua`, `show_flight_display.lua`, `send_actuator.lua`, `send_node.lua`, `run_forward_speed.lua` |
+| `control_hub/` | 从控制端向其他节点发送 RPC 消息，读取测速数据、GNSS 数据、显示测速数显、设置执行器转速，运行前行速度控制环和高度串级实验环。 | `config.lua`, `client.lua`, `display/`, `control_config.lua`, `pid.lua`, `rpc.lua`, `read_airspeed.lua`, `read_gnss.lua`, `monitor_airspeed.lua`, `display_dashboard.lua`, `show_flight_display.lua`, `send_actuator.lua`, `send_node.lua`, `run_forward_speed.lua`, `run_altitude_experiment.lua` |
+| `altitude_experiment/` | 高度串级实验电脑的独立部署目录。本机直接读取速度/高度并直接驱动本机推进器，不经过 `rednet`。 | `config.lua`, `client.lua`, `io.lua`, `airspeed.lua`, `gnss.lua`, `actuator.lua`, `control_config.lua`, `pid.lua`, `read_io.lua`, `set_actuator.lua`, `run_altitude_experiment.lua`, `README.txt` |
 | `airspeed_node/` | 监听测速请求，读取配置中定义的测速外设并返回速度值。 | `airspeed_node.lua`, `airspeed.lua`, `config.lua`, `rpc.lua` |
 | `gnss/` | 监听 GNSS 请求，读取 GPS 定位并返回 `x/y/z/altitude`。 | `gnss_node.lua`, `gnss.lua`, `config.lua`, `rpc.lua` |
 | `actuator_node/` | 监听执行器控制请求，调用外设的 `setSpeed`、`setGeneratedSpeed` 或 `stop` 方法。 | `actuator_node.lua`, `actuator.lua`, `rpc.lua`, `config.lua` |
 | `common/` | 公共模块源码。需要部署到节点目录的副本可通过 `tools/sync_common.ps1` 同步。 | `rpc.lua`, `actuator.lua`, `airspeed.lua`, `gnss.lua`, `pid.lua`, `inspect.lua` |
-| `display/` | 显示终端模块源码，负责获取显示用数据、刷新显示屏、绘制页面和处理显示菜单。需要部署到中控的副本可通过 `tools/sync_common.ps1` 同步。 | `device.lua`, `core.lua`, `menu.lua`, `plot.lua`, `airspeed.lua`, `flight.lua` |
+| `display/` | 显示终端模块源码，负责获取显示用数据、刷新显示屏、绘制页面和处理显示菜单。需要部署到中控的副本可通过 `tools/sync_common.ps1` 同步。 | `device.lua`, `core.lua`, `menu.lua`, `plot.lua`, `airspeed.lua`, `flight.lua`, `system.lua` |
 | `tools/` | 项目维护脚本。 | `sync_common.ps1` |
 
 ## 维护约定
@@ -123,6 +125,7 @@ components = {
 - `control_hub/display/plot.lua`
 - `control_hub/display/airspeed.lua`
 - `control_hub/display/flight.lua`
+- `control_hub/display/system.lua`
 - `control_hub/control_config.lua`
 - `control_hub/pid.lua`
 - `control_hub/rpc.lua`
@@ -134,6 +137,7 @@ components = {
 - `control_hub/send_actuator.lua`
 - `control_hub/send_node.lua`
 - `control_hub/run_forward_speed.lua`
+- `control_hub/run_altitude_experiment.lua`
 
 根据实际节点 ID 修改 `control_hub/config.lua`：
 
@@ -154,6 +158,74 @@ return {
 ```
 
 如果当前没有 GNSS 节点，可以先不配置 `GNSS`。
+
+### 高度串级实验电脑
+
+把以下文件放到实验电脑：
+
+- `altitude_experiment/config.lua`
+- `altitude_experiment/client.lua`
+- `altitude_experiment/airspeed.lua`
+- `altitude_experiment/gnss.lua`
+- `altitude_experiment/actuator.lua`
+- `altitude_experiment/control_config.lua`
+- `altitude_experiment/pid.lua`
+- `altitude_experiment/read_io.lua`
+- `altitude_experiment/set_actuator.lua`
+- `altitude_experiment/run_altitude_experiment.lua`
+
+这个目录是本机直连版：
+
+- 速度传感器由 `config.lua -> sensors` 定义
+- 高度由本机 `gps.locate()` 读取
+- 执行器由 `config.lua -> components` 定义
+- 不依赖 `rednet`、节点 ID 或远端执行器节点
+
+当前配置模板示例：
+
+```lua
+return {
+    sensors = {
+        forward = {
+            side = "left",
+            axis = "x",
+            index = 1,
+            scale = -1
+        },
+        down = {
+            side = "right",
+            axis = "y",
+            index = 2,
+            scale = 1
+        }
+    },
+    sensorOrder = { "forward", "down" },
+    gnss = {
+        timeout = 2,
+        fieldOrder = { "x", "y", "z", "altitude" }
+    },
+    components = {
+        TopThruster = {
+            side = "top",
+            scale = 1
+        }
+    }
+}
+```
+
+调驱动可先执行：
+
+```text
+read_io.lua
+set_actuator.lua TopThruster 64
+```
+
+运行串级实验：
+
+```text
+run_altitude_experiment.lua
+run_altitude_experiment.lua 100 1.0 0.8 0.2 --dry-run
+```
 
 ### 测速节点
 
@@ -346,6 +418,7 @@ display_dashboard.lua [displaySide] [period] [textScale]
 display.lua dashboard [displaySide] [period] [textScale]
 display.lua airspeed <displaySide> [period] [textScale]
 display.lua flight <displaySide> [textScale]
+display.lua io [displaySide] [period] [textScale]
 ```
 
 示例：
@@ -361,9 +434,11 @@ display.lua dashboard
 - 默认 `period = 0.5` 秒。
 - 默认 `textScale = 0.5`，适合较大的 3x3 显示屏显示更多内容。
 - 顶部菜单包含 `AIR`、`PLOT`、`FC`。
+- 顶部菜单包含 `AIR`、`PLOT`、`FC`、`IO`。
 - 支持显示屏点击顶部菜单切换页面；如果运行环境提供 `keys`，也可用左右方向键切换。
 - `AIR` 页显示目标速度、当前速度、目标高度、当前高度。
 - `PLOT` 页绘制速度和高度的时序图，其中目标值是常值线，当前值来自测速节点返回的数据源。
+- `IO` 页显示当前传感器和执行器的数值汇总。
 
 显示飞控姿态数显框架：
 
@@ -515,6 +590,80 @@ return {
 - `maxStep` 限制每个控制周期内“基础输出量”的最大变化量。
 - `outputs` 定义参与前行速度环的执行器列表。
 - 每个输出项的 `ratio` 表示该执行器相对于基础输出量的固定比例。
+
+运行高度串级实验环：
+
+```text
+run_altitude_experiment.lua [positionSetpoint] [outerKp] [innerKp] [period] [--dry-run]
+```
+
+示例：
+
+```text
+run_altitude_experiment.lua
+run_altitude_experiment.lua 100 1.0 0.8 0.2 --dry-run
+```
+
+当前实验模块的职责：
+
+- 读取 GNSS 高度字段作为外层位置测量。
+- 读取测速节点速度字段作为内层速度测量。
+- 外层位置环输出速度目标。
+- 内层速度环输出推进器基础输出量。
+- 基础输出量再按固定比例分配到多个推进器。
+
+默认配置位于 `control_hub/control_config.lua` 的 `altitudeExperiment` 段，例如：
+
+```lua
+altitudeExperiment = {
+    enabled = true,
+    period = 0.2,
+    positionSetpoint = 0,
+    maxStep = 16,
+    positionMeasurement = {
+        field = "altitude",
+        scale = 1
+    },
+    speedMeasurement = {
+        field = "down",
+        scale = -1
+    },
+    outputs = {
+        { node = "MainThruster", alias = "MainThruster", ratio = 1 },
+        { node = "LeftThruster", alias = "LeftThruster", ratio = 1 },
+        { node = "RightThruster", alias = "RightThruster", ratio = 1 }
+    },
+    outerPid = {
+        kp = 1.0,
+        ki = 0,
+        kd = 0,
+        bias = 0,
+        outputMin = -20,
+        outputMax = 20,
+        integralMin = -20,
+        integralMax = 20
+    },
+    innerPid = {
+        kp = 1.0,
+        ki = 0,
+        kd = 0,
+        bias = 0,
+        outputMin = -256,
+        outputMax = 256,
+        integralMin = -256,
+        integralMax = 256
+    },
+    stopOnSensorError = true
+}
+```
+
+其中：
+
+- `positionMeasurement.field` 定义外层位置环读取哪个字段。
+- `speedMeasurement.field` 定义内层速度环读取哪个字段。
+- `scale` 用于把传感器原始符号转换到控制所需符号。
+- `outerPid` 是位置环参数。
+- `innerPid` 是速度环参数。
 
 `display.dashboard.metrics` 定义 dashboard 要显示和绘制的量。每个条目都包含：
 

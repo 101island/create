@@ -7,6 +7,7 @@ local function usage()
     print("display.lua dashboard [side] [period] [scale]")
     print("display.lua airspeed <side> [period] [scale]")
     print("display.lua flight <side> [scale]")
+    print("display.lua io [side] [period] [scale]")
 end
 
 local function runScript(path, forwarded)
@@ -35,6 +36,10 @@ elseif command == "airspeed" then
     runScript("monitor_airspeed.lua", tail(2))
 elseif command == "flight" then
     runScript("show_flight_display.lua", tail(2))
+elseif command == "io" then
+    local forwarded = tail(2)
+    forwarded[#forwarded + 1] = "IO"
+    runScript("display_dashboard.lua", forwarded)
 else
     print("ERROR: Unknown display command [" .. tostring(command) .. "]")
     usage()

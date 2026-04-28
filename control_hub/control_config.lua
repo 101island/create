@@ -32,6 +32,58 @@ return {
         },
         stopOnSensorError = true
     },
+    altitudeExperiment = {
+        enabled = true,
+        period = 0.2,
+        positionSetpoint = 0,
+        maxStep = 16,
+        positionMeasurement = {
+            field = "altitude",
+            scale = 1
+        },
+        speedMeasurement = {
+            field = "down",
+            scale = -1
+        },
+        outputs = {
+            {
+                node = "MainThruster",
+                alias = "MainThruster",
+                ratio = 1
+            },
+            {
+                node = "LeftThruster",
+                alias = "LeftThruster",
+                ratio = 1
+            },
+            {
+                node = "RightThruster",
+                alias = "RightThruster",
+                ratio = 1
+            }
+        },
+        outerPid = {
+            kp = 1.0,
+            ki = 0,
+            kd = 0,
+            bias = 0,
+            outputMin = -20,
+            outputMax = 20,
+            integralMin = -20,
+            integralMax = 20
+        },
+        innerPid = {
+            kp = 1.0,
+            ki = 0,
+            kd = 0,
+            bias = 0,
+            outputMin = -256,
+            outputMax = 256,
+            integralMin = -256,
+            integralMax = 256
+        },
+        stopOnSensorError = true
+    },
     display = {
         dashboard = {
             metrics = {

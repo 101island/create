@@ -11,9 +11,28 @@ function M.getSensor(side)
     return sensor
 end
 
-function M.readAxis(sensor, axisName, index)
-    local v = sensor.getVelocity()
+function M.readVelocity(spec)
+    local sensor, err = M.getSensor(spec.side)
+    if not sensor then
+        return nil, err
+    end
 
+    if type(spec.remoteName) == "string" and spec.remoteName ~= "" then
+        if type(sensor.callRemote) ~= "function" then
+            return nil, "Device on " .. tostring(spec.side) .. " has no callRemote"
+        end
+
+        local ok, value = pcall(sensor.callRemote, spec.remoteName, "getVelocity")
+        if not ok then
+            return nil, tostring(value)
+        end
+        return value
+    end
+
+    return sensor.getVelocity()
+end
+
+function M.readAxis(v, axisName, index)
     if type(v) == "number" then
         return v
     end
@@ -63,12 +82,12 @@ function M.read(cfg, sensorName)
         return nil, "Unknown sensor [" .. tostring(sensorName) .. "]"
     end
 
-    local sensor, err = M.getSensor(spec.side)
-    if not sensor then
+    local raw, err = M.readVelocity(spec)
+    if raw == nil and err then
         return nil, err
     end
 
-    local value = M.readAxis(sensor, spec.axis, spec.index)
+    local value = M.readAxis(raw, spec.axis, spec.index)
     local scale = tonumber(spec.scale) or 1
     return value * scale
 end

@@ -69,4 +69,20 @@ function M.readGnss()
     return result
 end
 
+function M.readActuatorNode(nodeName)
+    local nodeID, err = M.nodeID(nodeName)
+    if not nodeID then
+        return nil, err
+    end
+
+    local result, readErr = M.call(nodeID, "actuator", "readAll", {}, 5)
+    if type(result) ~= "table" then
+        return nil, readErr
+    end
+
+    result.nodeID = nodeID
+    result.nodeName = nodeName
+    return result
+end
+
 return M
