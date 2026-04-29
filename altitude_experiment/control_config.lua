@@ -7,6 +7,11 @@ return {
         period = 0.2,
         displayPeriod = 0.5,
         plotHistory = 120,
+        logging = {
+            enabled = false,
+            path = "altitude_log.csv",
+            decimation = 1
+        },
         feedforward = {
             enabled = true,
             -- target = use target altitude, matching the reference script's hover_fill(target).

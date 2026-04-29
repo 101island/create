@@ -10,6 +10,7 @@ Copy these files to the experiment computer:
 config.lua
 control_config.lua
 runtime_state.lua
+data_logger.lua
 feedforward.lua
 pid.lua
 altitude.lua
@@ -20,6 +21,7 @@ client.lua
 read_io.lua
 test_sensors.lua
 set_actuator.lua
+collect_identification.lua
 display.lua
 display_dashboard.lua
 display/core.lua
@@ -74,6 +76,10 @@ innerPid.outputMin / outputMax:
 plotHistory:
   Number of runtime samples kept for the PLT page.
 
+logging:
+  CSV logging for MATLAB identification. Disabled by default unless --log is
+  passed to run_altitude_experiment.lua.
+
 feedforward:
   Height-dependent hover command. It follows the pressure/hover-fill model from
   the referenced pid.lua:
@@ -93,6 +99,17 @@ set_actuator.lua TopThruster 0
 set_actuator.lua TopThruster 5
 set_actuator.lua TopThruster 15
 
+Open-loop MATLAB identification collection:
+collect_identification.lua auto 1 5 6 0.2 altitude_id.csv
+
+Arguments:
+base|auto = center actuator level. auto uses the feedforward estimate.
+amplitude = +/- actuator level around base.
+holdSeconds = duration of each step.
+cycles = number of alternating high/low steps.
+period = sampling period.
+logPath = CSV output path.
+
 Run integrated controller and dashboard:
 run_altitude_experiment.lua
 
@@ -101,6 +118,21 @@ run_altitude_experiment.lua <targetAltitude> <outerKp> <innerKp> <period>
 run_altitude_experiment.lua 120 1.0 1.0 0.2
 run_altitude_experiment.lua 120 1.0 1.0 0.2 --dry-run
 run_altitude_experiment.lua 120 1.0 1.0 0.2 --no-display
+run_altitude_experiment.lua 120 1.0 1.0 0.2 --log
+run_altitude_experiment.lua 120 1.0 1.0 0.2 --log logs/altitude_step.csv
+
+MATLAB identification:
+MATLAB files are kept separately in:
+matlab/
+
+Copy the generated CSV log from the ComputerCraft computer into
+altitude_experiment/matlab/, then run:
+matlab/matlab_identification.m
+
+Logged columns include:
+t, target_altitude, altitude, altitude_error, target_speed, speed,
+speed_error, output_command, actuator_output, feedforward, correction,
+pressure, inner_segment, outer_segment, status.
 
 Standalone display preview:
 display.lua dashboard

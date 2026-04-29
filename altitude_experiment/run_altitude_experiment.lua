@@ -1,19 +1,31 @@
 local args = {...}
 local runtimeState = dofile("runtime_state.lua")
 local dashboard = dofile("display_dashboard.lua")
+local dataLogger = dofile("data_logger.lua")
 
 local values = {}
 local dryRun = false
 local noDisplay = false
+local logEnabled = nil
+local logPath = nil
 
-for _, arg in ipairs(args) do
+local index = 1
+while index <= #args do
+    local arg = args[index]
     if arg == "--dry-run" then
         dryRun = true
     elseif arg == "--no-display" then
         noDisplay = true
+    elseif arg == "--log" then
+        logEnabled = true
+        if args[index + 1] and args[index + 1]:sub(1, 2) ~= "--" and tonumber(args[index + 1]) == nil then
+            logPath = args[index + 1]
+            index = index + 1
+        end
     else
         values[#values + 1] = arg
     end
+    index = index + 1
 end
 
 local function optionalNumber(index, name)
@@ -53,6 +65,11 @@ local runtime = runtimeState.new({
     period = period
 })
 
+local logger = dataLogger.new(runtime.config.logging or {}, {
+    enabled = logEnabled,
+    path = logPath
+})
+
 if period ~= nil and period <= 0 then
     print("ERROR: Invalid period.")
     return
@@ -70,14 +87,21 @@ local function printHeader()
     print("inner PID correction: kp=" .. tostring(runtime.innerPid.kp) .. " ki=" .. tostring(runtime.innerPid.ki) .. " kd=" .. tostring(runtime.innerPid.kd) .. " bias=" .. tostring(runtime.innerPid.bias))
     print("correction range: " .. tostring(runtime.innerPid.outputMin) .. ".." .. tostring(runtime.innerPid.outputMax))
     print("actuator range: " .. tostring(runtime.feedforward.outputMin) .. ".." .. tostring(runtime.feedforward.outputMax))
+    print("logging: " .. tostring(logger.enabled) .. " " .. tostring(logger.path) .. (logger.err and (" ERR=" .. tostring(logger.err)) or ""))
     print("Use monitor touch or keyboard: left/right page, up/down field, -/+, space enable, m mode, r reset.")
 end
 
 local function controlLoop()
     printHeader()
+    local lastLogErr = nil
 
     while true do
         runtimeState.step(runtime, { applyOutput = true })
+        local logOk, logErr = dataLogger.write(logger, runtime)
+        if not logOk and logErr ~= lastLogErr then
+            print("LOG ERROR: " .. tostring(logErr))
+            lastLogErr = logErr
+        end
         print(runtimeState.summary(runtime))
         sleep(runtime.period)
     end
