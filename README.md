@@ -14,8 +14,6 @@ CC_Airship 是一组 Lua 脚本，用于通过 `rednet` 在控制端、测速节
 ├── gnss/              # GNSS 节点脚本
 ├── actuator_node/     # 执行器节点脚本
 ├── common/            # 公共模块源码和 inspect 工具
-├── display/           # 显示模块源码
-├── tools/             # 维护脚本
 └── CONFIG_NAMING.txt  # 节点和组件命名约定
 ```
 
@@ -28,27 +26,18 @@ CC_Airship 是一组 Lua 脚本，用于通过 `rednet` 在控制端、测速节
 | `airspeed_node/` | 监听测速请求，读取配置中定义的测速外设并返回速度值。 | `airspeed_node.lua`, `airspeed.lua`, `config.lua`, `rpc.lua` |
 | `gnss/` | 监听 GNSS 请求，读取 GPS 定位并返回 `x/y/z/altitude`。 | `gnss_node.lua`, `gnss.lua`, `config.lua`, `rpc.lua` |
 | `actuator_node/` | 监听执行器控制请求，调用外设的 `setSpeed`、`setGeneratedSpeed` 或 `stop` 方法。 | `actuator_node.lua`, `actuator.lua`, `rpc.lua`, `config.lua` |
-| `common/` | 公共模块源码。需要部署到节点目录的副本可通过 `tools/sync_common.ps1` 同步。 | `rpc.lua`, `actuator.lua`, `airspeed.lua`, `gnss.lua`, `pid.lua`, `inspect.lua` |
-| `display/` | 显示终端模块源码，负责获取显示用数据、刷新显示屏、绘制页面和处理显示菜单。需要部署到中控的副本可通过 `tools/sync_common.ps1` 同步。 | `device.lua`, `core.lua`, `menu.lua`, `plot.lua`, `airspeed.lua`, `flight.lua`, `system.lua` |
-| `tools/` | 项目维护脚本。 | `sync_common.ps1` |
+| `common/` | 公共模块源码和外设 inspect 工具。节点目录内的运行文件独立维护，不再通过同步脚本复制。 | `rpc.lua`, `actuator.lua`, `airspeed.lua`, `gnss.lua`, `pid.lua`, `inspect.lua` |
 
 ## 维护约定
 
 - 公共模块优先修改 `common/` 下的源码。
-- 显示模块优先修改 `display/` 下的源码。
-- 修改 `common/` 或 `display/` 下的源码后，运行同步脚本把副本复制到节点目录：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\sync_common.ps1
-```
-
-- 节点目录仍保留部署副本，因为每个节点运行时需要本地文件。
+- 节点目录保留运行文件；需要修改节点行为时，直接维护对应节点目录内的文件。
+- 显示模块只维护 `control_hub/display/` 下的源码，不再维护根目录 `display/`，也不通过同步脚本复制显示模块副本。
 - 控制端命令脚本只负责解析命令行参数；RPC 调用集中在 `control_hub/client.lua`。
 - 测速节点是测速通道的单一配置来源：请求名采用前-右-下坐标系，外设侧、轴名和显示顺序集中在 `airspeed_node/config.lua`。
 - GNSS 节点是绝对坐标和绝对高度的单一配置来源：字段顺序和 `gps.locate()` 超时集中在 `gnss/config.lua`。
-- 显示模块源码集中在 `display/`；中控部署副本位于 `control_hub/display/`。
-- `display/` 是显示终端模块：它负责获取显示所需数据、管理刷新周期、处理显示屏菜单、调用页面绘制组件。
-- `display/` 不负责控制闭环和执行器输出；PID、目标值计算和执行器写入仍由控制模块负责。
+- `control_hub/display/` 是显示终端模块：它负责获取显示所需数据、管理刷新周期、处理显示屏菜单、调用页面绘制组件。
+- `control_hub/display/` 不负责控制闭环和执行器输出；PID、目标值计算和执行器写入仍由控制模块负责。
 - 前行速度环的周期、输出对象、限幅和安全行为集中在 `control_hub/control_config.lua`。
 
 ## 通信协议
@@ -452,7 +441,7 @@ show_flight_display.lua <displaySide> [textScale]
 show_flight_display.lua left 1
 ```
 
-`display/flight.lua` 按飞控常用命名显示两组数据：
+`control_hub/display/flight.lua` 按飞控常用命名显示两组数据：
 
 - 姿态：`roll`、`pitch`、`yaw`
 - 姿态变化率：`p`、`q`、`r`
@@ -475,7 +464,7 @@ show_flight_display.lua left 1
 }
 ```
 
-当前项目还没有姿态传感器或姿态目标来源；后续确定姿态数据来源后，应由显示入口脚本获取真实状态，再调用 `display/flight.lua` 绘制。
+当前项目还没有姿态传感器或姿态目标来源；后续确定姿态数据来源后，应由显示入口脚本获取真实状态，再调用 `control_hub/display/flight.lua` 绘制。
 
 按节点 ID 设置执行器转速：
 
