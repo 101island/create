@@ -14,20 +14,22 @@ return {
         },
         feedforward = {
             enabled = true,
-            -- current = use current measured altitude. This makes the feedforward
-            -- a local hover estimate and lets the PIDs handle target tracking.
-            source = "current",
+            -- target = use the requested steady-state altitude for the hover
+            -- feedforward term. These points are not a controller output
+            -- schedule; the final actuator command is:
+            -- hover feedforward + inner speed PID correction.
+            source = "target",
             -- Measured hover curve. Porting to another craft should start by
-            -- retuning these few level points, then apply a small global gain
-            -- adjustment to the PID values only if needed.
+            -- retuning these steady-state hover level points, then apply a
+            -- small global gain adjustment to the PID values only if needed.
             levels = {
                 { altitude = 80, level = 4.00 },
                 { altitude = 100, level = 4.60 },
                 { altitude = 120, level = 5.25 },
                 { altitude = 140, level = 5.75 },
-                { altitude = 160, level = 6.00 },
-                { altitude = 180, level = 6.50 },
-                { altitude = 200, level = 7.05 },
+                { altitude = 160, level = 6.25 },
+                { altitude = 180, level = 7.00 },
+                { altitude = 200, level = 7.35 },
                 { altitude = 220, level = 7.60 }
             },
             -- Fallback pressure model. Used only when levels above are removed.
@@ -83,13 +85,19 @@ return {
             integralZone = 8,
             integralLeak = 0.98,
             resetIntegralOnErrorSignChange = true,
+            -- Match the host-side experimental controller:
+            -- speed target is tightened near zero altitude error.
+            dynamicOutputLimit = {
+                enabled = true,
+                coefficient = 0.06
+            },
             -- Segment output limits trade settling time against overshoot.
             -- Keep gains similar across bands for portability.
             segments = {
-                { name = "h080_120", altitudeMin = 80, altitudeMax = 120, outputMin = -0.25, outputMax = 0.25 },
-                { name = "h120_170", altitudeMin = 120, altitudeMax = 170, outputMin = -0.30, outputMax = 0.30 },
-                { name = "h170_220", altitudeMin = 170, altitudeMax = 220, outputMin = -0.35, outputMax = 0.35 },
-                { name = "outside", outputMin = -0.20, outputMax = 0.20 }
+                { name = "h080_120", altitudeMin = 80, altitudeMax = 120, ki = 0.010, outputMin = -0.25, outputMax = 0.25 },
+                { name = "h120_170", altitudeMin = 120, altitudeMax = 170, ki = 0.009, outputMin = -0.30, outputMax = 0.30 },
+                { name = "h170_220", altitudeMin = 170, altitudeMax = 220, ki = 0.008, outputMin = -0.35, outputMax = 0.35 },
+                { name = "outside", ki = 0.008, outputMin = -0.20, outputMax = 0.20 }
             }
         },
         innerPid = {
@@ -106,10 +114,10 @@ return {
             integralLeak = 0.98,
             resetIntegralOnErrorSignChange = true,
             segments = {
-                { name = "h080_120", altitudeMin = 80, altitudeMax = 120, kp = 1.4, outputMin = -0.9, outputMax = 0.9 },
-                { name = "h120_170", altitudeMin = 120, altitudeMax = 170, kp = 1.5, outputMin = -1.0, outputMax = 1.0 },
-                { name = "h170_220", altitudeMin = 170, altitudeMax = 220, kp = 1.6, outputMin = -1.2, outputMax = 1.2 },
-                { name = "outside", kp = 1.2, outputMin = -0.8, outputMax = 0.8 }
+                { name = "h080_120", altitudeMin = 80, altitudeMax = 120, kp = 1.4, ki = 0.012, outputMin = -0.9, outputMax = 0.9 },
+                { name = "h120_170", altitudeMin = 120, altitudeMax = 170, kp = 1.5, ki = 0.014, outputMin = -1.0, outputMax = 1.0 },
+                { name = "h170_220", altitudeMin = 170, altitudeMax = 220, kp = 1.6, ki = 0.014, outputMin = -1.2, outputMax = 1.2 },
+                { name = "outside", kp = 1.2, ki = 0.012, outputMin = -0.8, outputMax = 0.8 }
             }
         },
         stopOnSensorError = true

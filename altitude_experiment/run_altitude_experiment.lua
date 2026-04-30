@@ -2,11 +2,11 @@ local args = {...}
 local runtimeState = dofile("runtime_state.lua")
 local dashboard = dofile("display_dashboard.lua")
 local dataLogger = dofile("data_logger.lua")
-local actuator = dofile("actuator.lua")
 
 local values = {}
 local dryRun = false
 local noDisplay = false
+local once = false
 local logEnabled = nil
 local logPath = nil
 
@@ -17,6 +17,8 @@ while index <= #args do
         dryRun = true
     elseif arg == "--no-display" then
         noDisplay = true
+    elseif arg == "--once" then
+        once = true
     elseif arg == "--log" then
         logEnabled = true
         if args[index + 1] and args[index + 1]:sub(1, 2) ~= "--" and tonumber(args[index + 1]) == nil then
@@ -108,6 +110,30 @@ local function controlLoop()
     end
 end
 
+local function printOutputDetails()
+    local commands = runtime.output and runtime.output.commands or {}
+    print("DETAIL:")
+    print("  position current=" .. tostring(runtime.position and runtime.position.current) ..
+        " target=" .. tostring(runtime.position and runtime.position.target) ..
+        " error=" .. tostring(runtime.position and runtime.position.error))
+    print("  speed current=" .. tostring(runtime.speed and runtime.speed.current) ..
+        " target=" .. tostring(runtime.speed and runtime.speed.target) ..
+        " error=" .. tostring(runtime.speed and runtime.speed.error))
+    print("  feedforward=" .. tostring(runtime.output and runtime.output.feedforward) ..
+        " correction=" .. tostring(runtime.output and runtime.output.correction) ..
+        " requested=" .. tostring(runtime.output and runtime.output.requested) ..
+        " actuator_command=" .. tostring(runtime.output and (runtime.output.actuatorCommand or runtime.output.base)))
+    for _, item in ipairs(commands) do
+        print("  command " .. tostring(item.alias) ..
+            " command=" .. tostring(item.command) ..
+            " exact=" .. tostring(item.exactOutput) ..
+            " instant=" .. tostring(item.instantOutput) ..
+            " method=" .. tostring(item.method) ..
+            (item.err and (" err=" .. tostring(item.err)) or ""))
+    end
+    print("  status=" .. tostring(runtime.status))
+end
+
 local function displayLoop()
     if noDisplay then
         while true do
@@ -134,7 +160,15 @@ local function pwmLoop()
         end
     end
 
-    actuator.runPwm(runtime.hardware)
+    runtimeState.runActuatorPwm(runtime)
+end
+
+if once then
+    printHeader()
+    runtimeState.step(runtime, { applyOutput = true })
+    print(runtimeState.summary(runtime))
+    printOutputDetails()
+    return
 end
 
 if type(parallel) == "table" and type(parallel.waitForAny) == "function" then

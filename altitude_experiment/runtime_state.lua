@@ -294,6 +294,7 @@ local function applyCommands(runtime, baseOutput)
     if runtime.dryRun then
         return {
             base = baseOutput,
+            actuatorCommand = baseOutput,
             commands = commands,
             dryRun = true
         }
@@ -313,6 +314,7 @@ local function applyCommands(runtime, baseOutput)
 
     return {
         base = baseOutput,
+        actuatorCommand = baseOutput,
         commands = commands,
         dryRun = false
     }
@@ -340,6 +342,36 @@ local function feedforwardAltitude(runtime, position)
     return runtime.setpoints.altitude or position
 end
 
+local function dynamicOuterLimit(runtime, positionError)
+    local outerCfg = runtime.config and runtime.config.outerPid or {}
+    local limitCfg = outerCfg.dynamicOutputLimit
+    if type(limitCfg) ~= "table" or limitCfg.enabled == false then
+        return nil
+    end
+
+    local errorValue = tonumber(positionError)
+    if errorValue == nil then
+        return nil
+    end
+
+    local coefficient = tonumber(limitCfg.coefficient) or 0
+    if coefficient <= 0 then
+        return nil
+    end
+
+    local limit = math.sqrt(math.max(0, coefficient * math.abs(errorValue)))
+    local outputMax = tonumber(runtime.outerPid and runtime.outerPid.outputMax)
+    local outputMin = tonumber(runtime.outerPid and runtime.outerPid.outputMin)
+    if outputMax ~= nil then
+        limit = math.min(limit, math.abs(outputMax))
+    end
+    if outputMin ~= nil then
+        limit = math.min(limit, math.abs(outputMin))
+    end
+
+    return limit
+end
+
 local function updateActuatorSnapshot(runtime)
     runtime.io.actuators = actuator.readAll(runtime.hardware)
 end
@@ -362,7 +394,7 @@ local function pushHistory(runtime, timestamp)
         altitudeTarget = runtime.position.target,
         speed = runtime.speed.current,
         speedTarget = runtime.speed.target,
-        output = runtime.output and runtime.output.base,
+        output = runtime.output and (runtime.output.actuatorCommand or runtime.output.base),
         feedforward = runtime.output and runtime.output.feedforward,
         correction = runtime.output and runtime.output.correction,
         status = runtime.status
@@ -453,6 +485,15 @@ function M.step(runtime, options)
         if runtime.enabled then
             speedTarget, outerInfo = pid.update(runtime.outerPid, runtime.setpoints.altitude, position, dt, type(speed) == "number" and -speed or nil)
             outerErr = type(outerInfo) == "string" and outerInfo or nil
+            if type(speedTarget) == "number" then
+                local limit = dynamicOuterLimit(runtime, runtime.setpoints.altitude - position)
+                if limit ~= nil then
+                    speedTarget = clamp(speedTarget, -limit, limit)
+                    if type(outerInfo) == "table" then
+                        outerInfo.dynamicOutputLimit = limit
+                    end
+                end
+            end
         else
             outerInfo = {
                 error = runtime.setpoints.altitude - position,
@@ -486,6 +527,7 @@ function M.step(runtime, options)
         else
             runtime.output = {
                 base = 0,
+                actuatorCommand = 0,
                 commands = buildCommands(runtime, 0),
                 disabled = true
             }
@@ -529,27 +571,30 @@ function M.step(runtime, options)
     end
 
     local requestedOutput = (tonumber(ff.level) or 0) + correction
-    local baseOutput = clampActuatorCommand(runtime, requestedOutput)
-    baseOutput = limitStep(runtime, baseOutput)
-    runtime.lastBaseOutput = baseOutput
+    local actuatorCommand = clampActuatorCommand(runtime, requestedOutput)
+    actuatorCommand = limitStep(runtime, actuatorCommand)
+    runtime.lastBaseOutput = actuatorCommand
 
     local result, outputErr, commands
     if applyOutput then
-        result, outputErr, commands = applyCommands(runtime, baseOutput)
+        result, outputErr, commands = applyCommands(runtime, actuatorCommand)
     else
-        commands = buildCommands(runtime, baseOutput)
+        commands = buildCommands(runtime, actuatorCommand)
         result = {
-            base = baseOutput,
+            base = actuatorCommand,
+            actuatorCommand = actuatorCommand,
             commands = commands,
             preview = true
         }
     end
 
     runtime.output = result or {
-        base = baseOutput,
+        base = actuatorCommand,
+        actuatorCommand = actuatorCommand,
         commands = commands or {},
         err = outputErr
     }
+    runtime.output.actuatorCommand = actuatorCommand
     runtime.output.requested = requestedOutput
     runtime.output.feedforward = ff.level
     runtime.output.feedforwardFill = ff.fill
@@ -583,7 +628,7 @@ function M.summary(runtime)
         "spd_tgt=" .. formatNumber(runtime.speed.target),
         "ff=" .. formatNumber(runtime.output and runtime.output.feedforward),
         "cor=" .. formatNumber(runtime.output and runtime.output.correction),
-        "out=" .. formatNumber(runtime.output and runtime.output.base),
+        "out=" .. formatNumber(runtime.output and (runtime.output.actuatorCommand or runtime.output.base)),
         "seg=" .. tostring(runtime.output and runtime.output.innerSegment),
         "status=" .. tostring(runtime.status)
     }
@@ -611,6 +656,13 @@ function M.snapshot(runtime)
         innerPid = runtime.innerPid,
         outerPid = runtime.outerPid
     }
+end
+
+function M.runActuatorPwm(runtime, options)
+    if type(runtime) ~= "table" then
+        return nil, "Missing runtime"
+    end
+    return actuator.runPwm(runtime.hardware, options)
 end
 
 return M

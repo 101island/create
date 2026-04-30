@@ -31,6 +31,9 @@ return {
             -- Normal mapping: output = command * 1 + 0.
             -- Inverted 0..15 mapping: output = command * -1 + 15.
             peripheralType = "redstone_relay",
+            -- Fill this with the exact wired peripheral name if multiple
+            -- redstone relays exist, for example "redstone_relay_0".
+            remoteName = "redstone_relay_0",
             outputSide = "left",
             scale = 1,
             bias = 0,

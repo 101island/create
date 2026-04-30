@@ -105,17 +105,44 @@ function M.wrap(cfg, alias)
     if type(spec) ~= "table" then
         return nil, "Unknown alias [" .. tostring(alias) .. "]"
     end
-    if type(peripheral) ~= "table" or type(peripheral.find) ~= "function" then
-        return nil, "peripheral.find() is not available in this runtime"
+    if type(peripheral) ~= "table" then
+        return nil, "peripheral API is not available in this runtime"
     end
 
     local peripheralType = spec.peripheralType or "redstone_relay"
-    local device = peripheral.find(peripheralType)
+    local remoteName = spec.remoteName
+    local device
+    local address
+
+    if type(remoteName) == "string" and remoteName ~= "" then
+        if type(peripheral.wrap) ~= "function" then
+            return nil, "peripheral.wrap() is not available in this runtime"
+        end
+        device = peripheral.wrap(remoteName)
+        address = remoteName
+        if not device then
+            return nil, "Could not wrap peripheral [" .. tostring(remoteName) .. "]"
+        end
+        if type(peripheral.getType) == "function" then
+            local actualType = peripheral.getType(remoteName)
+            if actualType ~= peripheralType then
+                return nil, "[" .. tostring(remoteName) .. "] is [" .. tostring(actualType) ..
+                    "], expected [" .. tostring(peripheralType) .. "]"
+            end
+        end
+    else
+        if type(peripheral.find) ~= "function" then
+            return nil, "peripheral.find() is not available in this runtime"
+        end
+        device = peripheral.find(peripheralType)
+        address = peripheralType
+    end
+
     if not device then
         return nil, "Could not find peripheral type [" .. tostring(peripheralType) .. "]"
     end
 
-    return device, nil, peripheralType, spec
+    return device, nil, address, spec
 end
 
 function M.setOutput(cfg, alias, command)

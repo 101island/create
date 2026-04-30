@@ -140,7 +140,7 @@ local function row(runtime)
         runtime.speed and runtime.speed.target,
         runtime.speed and runtime.speed.current,
         runtime.speed and runtime.speed.error,
-        runtime.output and runtime.output.base,
+        runtime.output and (runtime.output.actuatorCommand or runtime.output.base),
         command.output or command.command,
         runtime.output and runtime.output.feedforward,
         runtime.output and runtime.output.correction,

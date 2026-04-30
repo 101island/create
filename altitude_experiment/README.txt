@@ -42,7 +42,7 @@ display.side:
   Side of the wired modem or monitor peripheral. Current value: top.
 
 display.remoteName:
-  Remote monitor name on the wired modem. Current value: monitor_0.
+  Remote monitor name on the wired modem. Current value: monitor_1.
 
 components.TopThruster.peripheralType:
   Actuator peripheral type. Current value: redstone_relay.
@@ -90,9 +90,10 @@ logging:
   passed to run_altitude_experiment.lua.
 
 feedforward:
-  Height-dependent hover command. It follows the pressure/hover-fill model from
-  the referenced pid.lua:
-  final actuator command = feedforward level + signed inner PID correction.
+  Height-dependent steady-state hover term. It is not an actuator output
+  schedule by itself:
+  final actuator command = hover feedforward + signed inner speed PID correction.
+  source = target means the hover term is selected from the target altitude.
   referenceAltitude and referenceLevel are the measured hover calibration point.
 
 outerPid.segments / innerPid.segments:
@@ -122,13 +123,16 @@ pattern = step, prbs, or three.
 seed = PRBS random seed.
 
 Run integrated controller and dashboard:
-run_altitude_experiment.lua
+run_altitude_experiment.lua <targetAltitude>
 
 Optional arguments:
+run_altitude_experiment.lua 100
+run_altitude_experiment.lua 120
 run_altitude_experiment.lua <targetAltitude> <outerKp> <innerKp> <period>
 run_altitude_experiment.lua 120 1.0 1.0 0.2
 run_altitude_experiment.lua 120 1.0 1.0 0.2 --dry-run
 run_altitude_experiment.lua 120 1.0 1.0 0.2 --no-display
+run_altitude_experiment.lua 120 --once
 run_altitude_experiment.lua 120 1.0 1.0 0.2 --log
 run_altitude_experiment.lua 120 1.0 1.0 0.2 --log logs/altitude_step.csv
 
