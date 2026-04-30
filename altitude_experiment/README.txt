@@ -75,10 +75,11 @@ plotHistory:
   Number of runtime samples kept for the PLT page.
 
 feedforward:
-  Height-dependent hover command. It follows the pressure/hover-fill model from
-  the referenced pid.lua:
+  Height-dependent hover command. It follows the calibrated model from
+  aero/airship.lua:
   final actuator command = feedforward level + signed inner PID correction.
-  referenceAltitude and referenceLevel are the measured hover calibration point.
+  n_hover = A + C / rho(h + delta_h)
+  calibrationOffsetA / calibrationConstantC / deltaH define that model.
 
 outerPid.segments / innerPid.segments:
   Altitude bands for gain scheduling. A segment may override kp, ki, kd,

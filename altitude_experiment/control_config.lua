@@ -9,12 +9,13 @@ return {
         plotHistory = 120,
         feedforward = {
             enabled = true,
-            -- target = use target altitude, matching the reference script's hover_fill(target).
+            -- target = use target altitude, matching the reference script's hover_level(target).
             -- current = use current measured altitude.
             source = "target",
-            -- Calibration point from the referenced pid.lua.
-            referenceAltitude = 205,
-            referenceLevel = 7,
+            -- Calibrated hover model: n_hover = A + C / rho(h + delta_h)
+            calibrationOffsetA = 0.106800,
+            calibrationConstantC = 4.100487,
+            deltaH = 7.4,
             capacity = 122,
             maxSteamOutput = 200,
             outputMin = 0,

@@ -186,13 +186,13 @@
 思路是：
 
 - 高度越高，空气密度越低
-- 为维持悬停，需要更高的蒸汽填充/推力
+- 为维持悬停，需要更高的基础输出
 - 先根据高度估算压力（密度）
-- 再把密度换算成参考高度对应的悬停输出比例
+- 再用标定模型 `n_hover = A + C / rho(h + delta_h)` 直接得到悬停输出
 
 模型来源于 `control_config.lua` 中的参数：
 
-- `referenceAltitude` / `referenceLevel`：已知的悬停校准点
+- `calibrationOffsetA` / `calibrationConstantC` / `deltaH`：悬停标定参数
 - `capacity` / `maxSteamOutput`：系统容量与输出上限
 - `pressure`：压力曲线参数，默认会自动生成一条分段平滑曲线
 

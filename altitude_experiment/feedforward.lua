@@ -117,21 +117,21 @@ function M.new(cfg)
         points = createDefaultPressureCurve(pressureCfg)
     end
 
-    local referenceAltitude = tonumber(cfg.referenceAltitude) or 205
-    local referenceLevel = tonumber(cfg.referenceLevel) or 7
+    local calibrationOffsetA = tonumber(cfg.calibrationOffsetA) or 0
+    local calibrationConstantC = tonumber(cfg.calibrationConstantC) or 7
+    local deltaH = tonumber(cfg.deltaH) or 0
     local maxSteamOutput = tonumber(cfg.maxSteamOutput) or 200
     local capacity = tonumber(cfg.capacity) or 122
     local outputMin = tonumber(cfg.outputMin) or 0
     local outputMax = tonumber(cfg.outputMax) or 15
-    local referenceFill = maxSteamOutput * referenceLevel / 15
 
     return {
         enabled = cfg.enabled ~= false,
         source = cfg.source or "target",
         points = points,
-        referenceAltitude = referenceAltitude,
-        referenceLevel = referenceLevel,
-        referenceFill = referenceFill,
+        calibrationOffsetA = calibrationOffsetA,
+        calibrationConstantC = calibrationConstantC,
+        deltaH = deltaH,
         maxSteamOutput = maxSteamOutput,
         capacity = capacity,
         outputMin = outputMin,
@@ -153,7 +153,7 @@ function M.evaluate(model, altitude)
         return nil, "Invalid feedforward altitude"
     end
 
-    local density, densityErr = evaluatePressure(model.points, h)
+    local density, densityErr = evaluatePressure(model.points, h + (model.deltaH or 0))
     if density == nil then
         return nil, densityErr
     end
@@ -161,18 +161,15 @@ function M.evaluate(model, altitude)
         density = 0.000001
     end
 
-    local referenceDensity = evaluatePressure(model.points, model.referenceAltitude) or 1
-    local fill = model.referenceFill * (referenceDensity / density)
-    fill = clamp(fill, 0, model.capacity)
-
-    local level = fill / model.maxSteamOutput * 15
+    local level = (model.calibrationOffsetA or 0) + (model.calibrationConstantC or 0) / density
     level = clamp(level, model.outputMin, model.outputMax)
+    local fill = level / 15 * model.maxSteamOutput
+    fill = clamp(fill, 0, model.capacity)
 
     return {
         level = level,
         fill = fill,
-        density = density,
-        referenceDensity = referenceDensity
+        density = density
     }
 end
 
