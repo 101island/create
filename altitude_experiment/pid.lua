@@ -22,14 +22,19 @@ function M.new(cfg)
         outputMax = tonumber(cfg.outputMax),
         integralMin = tonumber(cfg.integralMin),
         integralMax = tonumber(cfg.integralMax),
+        integralZone = tonumber(cfg.integralZone),
+        integralLeak = tonumber(cfg.integralLeak),
+        resetIntegralOnErrorSignChange = cfg.resetIntegralOnErrorSignChange == true,
         integral = 0,
-        previousError = nil
+        previousError = nil,
+        previousIntegralError = nil
     }
 end
 
 function M.reset(state)
     state.integral = 0
     state.previousError = nil
+    state.previousIntegralError = nil
 end
 
 function M.update(state, setpoint, measurement, dt, derivative)
@@ -52,11 +57,28 @@ function M.update(state, setpoint, measurement, dt, derivative)
     end
 
     local errorValue = target - current
-    state.integral = clamp(
-        state.integral + errorValue * elapsed,
-        state.integralMin,
-        state.integralMax
-    )
+    local shouldIntegrate = true
+    if state.integralZone ~= nil and math.abs(errorValue) > state.integralZone then
+        shouldIntegrate = false
+    end
+    if state.resetIntegralOnErrorSignChange and
+        state.previousIntegralError ~= nil and
+        errorValue * state.previousIntegralError < 0 then
+        state.integral = 0
+    end
+    if shouldIntegrate then
+        state.integral = clamp(
+            state.integral + errorValue * elapsed,
+            state.integralMin,
+            state.integralMax
+        )
+    else
+        local leak = state.integralLeak
+        if leak ~= nil and leak >= 0 and leak <= 1 then
+            state.integral = state.integral * leak
+        end
+    end
+    state.previousIntegralError = errorValue
 
     local derivativeValue = tonumber(derivative)
     if derivativeValue == nil then

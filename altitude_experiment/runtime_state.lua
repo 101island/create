@@ -71,7 +71,10 @@ local pidFields = {
     "outputMin",
     "outputMax",
     "integralMin",
-    "integralMax"
+    "integralMax",
+    "integralZone",
+    "integralLeak",
+    "resetIntegralOnErrorSignChange"
 }
 
 local function applyPidFields(state, cfg)
@@ -81,9 +84,13 @@ local function applyPidFields(state, cfg)
 
     for _, field in ipairs(pidFields) do
         if cfg[field] ~= nil then
-            local value = tonumber(cfg[field])
-            if value ~= nil then
-                state[field] = value
+            if type(cfg[field]) == "boolean" then
+                state[field] = cfg[field]
+            else
+                local value = tonumber(cfg[field])
+                if value ~= nil then
+                    state[field] = value
+                end
             end
         end
     end
@@ -147,6 +154,8 @@ function M.new(options)
         outputCfg = controlCfg.outputs or {},
         positionSpec = controlCfg.positionMeasurement or {},
         speedSpec = controlCfg.speedMeasurement or {},
+        speedFilterAlpha = tonumber(controlCfg.speedFilterAlpha) or 1,
+        filteredSpeed = nil,
         outerPid = pid.new(controlCfg.outerPid or {}),
         innerPid = pid.new(controlCfg.innerPid or {}),
         feedforward = feedforward.new(controlCfg.feedforward or {}),
@@ -193,6 +202,7 @@ function M.reset(runtime)
     pid.reset(runtime.outerPid)
     pid.reset(runtime.innerPid)
     runtime.lastBaseOutput = nil
+    runtime.filteredSpeed = nil
 end
 
 function M.setEnabled(runtime, enabled)
@@ -295,7 +305,8 @@ local function applyCommands(runtime, baseOutput)
             item.err = err
             return nil, item.alias .. ": " .. tostring(err), commands
         end
-        item.output = result.output
+        item.output = result.exactOutput or result.output
+        item.instantOutput = result.output
         item.exactOutput = result.exactOutput
         item.method = result.method
     end
@@ -388,7 +399,17 @@ function M.step(runtime, options)
     local sensors = runtime.io.sensors
 
     local position, positionErr = readField(sensors, runtime.positionSpec)
-    local speed, speedErr = readField(sensors, runtime.speedSpec)
+    local rawSpeed, speedErr = readField(sensors, runtime.speedSpec)
+    local speed = rawSpeed
+    if type(rawSpeed) == "number" then
+        local alpha = clamp(tonumber(runtime.speedFilterAlpha) or 1, 0, 1)
+        if runtime.filteredSpeed == nil or alpha >= 1 then
+            runtime.filteredSpeed = rawSpeed
+        else
+            runtime.filteredSpeed = runtime.filteredSpeed + alpha * (rawSpeed - runtime.filteredSpeed)
+        end
+        speed = runtime.filteredSpeed
+    end
     local outerSegment = applyPidSchedule(runtime.outerPid, runtime.config.outerPid, position)
     local innerSegment = applyPidSchedule(runtime.innerPid, runtime.config.innerPid, position)
 
@@ -402,6 +423,7 @@ function M.step(runtime, options)
     runtime.speed = {
         target = runtime.setpoints.speed,
         current = speed,
+        raw = rawSpeed,
         err = speedErr,
         error = speed and (runtime.setpoints.speed - speed) or nil,
         pidSegment = innerSegment

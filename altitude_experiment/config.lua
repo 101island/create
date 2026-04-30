@@ -18,6 +18,13 @@ return {
         remoteName = "monitor_1"
     },
 
+    -- Fractional actuator commands are emitted by a fixed-rate PDM/PWM
+    -- service. 0.05 s is one Minecraft tick at 20 TPS.
+    actuatorPwm = {
+        enabled = true,
+        period = 0.05
+    },
+
     components = {
         TopThruster = {
             -- redstone_relay analog output: 0..15.

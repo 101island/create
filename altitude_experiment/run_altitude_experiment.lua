@@ -2,6 +2,7 @@ local args = {...}
 local runtimeState = dofile("runtime_state.lua")
 local dashboard = dofile("display_dashboard.lua")
 local dataLogger = dofile("data_logger.lua")
+local actuator = dofile("actuator.lua")
 
 local values = {}
 local dryRun = false
@@ -126,9 +127,19 @@ local function displayLoop()
     end
 end
 
+local function pwmLoop()
+    if dryRun then
+        while true do
+            sleep(3600)
+        end
+    end
+
+    actuator.runPwm(runtime.hardware)
+end
+
 if type(parallel) == "table" and type(parallel.waitForAny) == "function" then
-    parallel.waitForAny(controlLoop, displayLoop)
+    parallel.waitForAny(controlLoop, displayLoop, pwmLoop)
 else
-    print("WARN: parallel.waitForAny is unavailable; running control loop only.")
+    print("WARN: parallel.waitForAny is unavailable; fractional actuator PWM will not refresh independently.")
     controlLoop()
 end

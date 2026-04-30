@@ -22,6 +22,7 @@ read_io.lua
 test_sensors.lua
 set_actuator.lua
 collect_identification.lua
+matlab_bridge.lua
 display.lua
 display_dashboard.lua
 display/core.lua
@@ -56,6 +57,14 @@ components.TopThruster.bias:
   Output offset before clamping.
   Normal 0..15 mapping: scale = 1, bias = 0.
   Inverted 0..15 mapping: scale = -1, bias = 15.
+
+actuatorPwm.enabled / period:
+  Fractional outputs are held by a background PDM/PWM service, not by a
+  one-shot set call. period = 0.05 means one 20 TPS Minecraft tick.
+  Long-running programs below start this service automatically:
+  run_altitude_experiment.lua, matlab_bridge.lua, collect_identification.lua.
+  A one-shot set_actuator.lua command is reliable for integer levels only
+  unless another long-running program is already refreshing PWM.
 
 Control config:
 control_config.lua
@@ -100,15 +109,17 @@ set_actuator.lua TopThruster 5
 set_actuator.lua TopThruster 15
 
 Open-loop MATLAB identification collection:
-collect_identification.lua auto 1 5 6 0.2 altitude_id.csv
+collect_identification.lua auto 1 5 12 0.2 altitude_id.csv prbs 12345
 
 Arguments:
 base|auto = center actuator level. auto uses the feedforward estimate.
 amplitude = +/- actuator level around base.
 holdSeconds = duration of each step.
-cycles = number of alternating high/low steps.
+cycles = number of held command levels.
 period = sampling period.
 logPath = CSV output path.
+pattern = step, prbs, or three.
+seed = PRBS random seed.
 
 Run integrated controller and dashboard:
 run_altitude_experiment.lua
@@ -121,18 +132,40 @@ run_altitude_experiment.lua 120 1.0 1.0 0.2 --no-display
 run_altitude_experiment.lua 120 1.0 1.0 0.2 --log
 run_altitude_experiment.lua 120 1.0 1.0 0.2 --log logs/altitude_step.csv
 
-MATLAB identification:
+MATLAB / Simulink bridge:
 MATLAB files are kept separately in:
 matlab/
 
-Copy the generated CSV log from the ComputerCraft computer into
-altitude_experiment/matlab/, then run:
-matlab/matlab_identification.m
+Run the Python bridge on the PC:
+python matlab/bridge_host.py --host 0.0.0.0 --port 8768
 
-Logged columns include:
-t, target_altitude, altitude, altitude_error, target_speed, speed,
-speed_error, output_command, actuator_output, feedforward, correction,
-pressure, inner_segment, outer_segment, status.
+Run the WebSocket client on the ComputerCraft experiment computer:
+matlab_bridge.lua ws://<PC_IP>:8768/cc 0.2 TopThruster
+
+If the bridge was started with a token:
+python matlab/bridge_host.py --host 0.0.0.0 --port 8768 --token <token>
+matlab_bridge.lua ws://<PC_IP>:8768/cc 0.2 TopThruster <token>
+
+Then in MATLAB, set altitude_experiment/matlab/ as the current folder and use:
+baseUrl = "http://127.0.0.1:8768";
+token = "<token>";
+alias = "TopThruster";
+cc_bridge_read(baseUrl, token, alias)
+cc_bridge_write(7.5, baseUrl, token, alias)
+cc_bridge_stop(baseUrl, token, alias)
+sable_set_height_trigger(150, 1)
+
+The bridge reuses io.lua and actuator.lua on the ComputerCraft computer.
+MATLAB reads the latest sensors/actuators through HTTP and queues actuator
+commands through HTTP; the ComputerCraft computer receives commands through
+WebSocket.
+
+Current MATLAB .m files are only passthrough helpers for Simulink:
+cc_bridge_config.m
+cc_bridge_read.m
+cc_bridge_write.m
+cc_bridge_stop.m
+sable_set_height_trigger.m
 
 Standalone display preview:
 display.lua dashboard

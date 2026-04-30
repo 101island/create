@@ -18,6 +18,72 @@ local function addPoint(points, altitude, value, slope)
     }
 end
 
+local function copyLevelPoints(source)
+    if type(source) ~= "table" then
+        return nil
+    end
+
+    local points = {}
+    for _, item in ipairs(source) do
+        local altitude
+        local level
+        if type(item) == "table" then
+            altitude = tonumber(item.altitude or item[1])
+            level = tonumber(item.level or item.value or item[2])
+        end
+        if altitude ~= nil and level ~= nil then
+            points[#points + 1] = {
+                altitude = altitude,
+                level = level
+            }
+        end
+    end
+
+    table.sort(points, function(left, right)
+        return left.altitude < right.altitude
+    end)
+
+    if #points == 0 then
+        return nil
+    end
+    return points
+end
+
+local function interpolateLevel(points, altitude)
+    local h = tonumber(altitude)
+    if h == nil then
+        return nil, "Invalid altitude"
+    end
+
+    local count = #points
+    if count == 1 then
+        return points[1].level
+    end
+
+    local left = points[1]
+    local right = points[2]
+    if h >= points[count].altitude then
+        left = points[count - 1]
+        right = points[count]
+    else
+        for index = 2, count do
+            if h <= points[index].altitude then
+                left = points[index - 1]
+                right = points[index]
+                break
+            end
+        end
+    end
+
+    local span = right.altitude - left.altitude
+    if span == 0 then
+        return left.level
+    end
+
+    local ratio = (h - left.altitude) / span
+    return left.level + (right.level - left.level) * ratio
+end
+
 local function evaluatePressure(points, altitude)
     local h = tonumber(altitude)
     if h == nil then
@@ -124,10 +190,12 @@ function M.new(cfg)
     local outputMin = tonumber(cfg.outputMin) or 0
     local outputMax = tonumber(cfg.outputMax) or 15
     local referenceFill = maxSteamOutput * referenceLevel / 15
+    local levelPoints = copyLevelPoints(cfg.levels or cfg.levelPoints)
 
     return {
         enabled = cfg.enabled ~= false,
         source = cfg.source or "target",
+        levelPoints = levelPoints,
         points = points,
         referenceAltitude = referenceAltitude,
         referenceLevel = referenceLevel,
@@ -151,6 +219,20 @@ function M.evaluate(model, altitude)
     local h = tonumber(altitude)
     if h == nil then
         return nil, "Invalid feedforward altitude"
+    end
+
+    if type(model.levelPoints) == "table" then
+        local level, levelErr = interpolateLevel(model.levelPoints, h)
+        if level == nil then
+            return nil, levelErr
+        end
+        level = clamp(level, model.outputMin, model.outputMax)
+        return {
+            level = level,
+            fill = nil,
+            density = nil,
+            source = "levelPoints"
+        }
     end
 
     local density, densityErr = evaluatePressure(model.points, h)

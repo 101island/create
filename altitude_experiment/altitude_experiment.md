@@ -37,7 +37,7 @@
 
 - `altitude.lua`：读取绝对高度传感器
 - `vertical_speed.lua`：由高度差分估算垂直速度
-- `actuator.lua`：执行器封装，支持缩放、偏置、限幅、PWM 抖动量化
+- `actuator.lua`：执行器封装，支持缩放、偏置、限幅、固定周期 PDM/PWM
 - `io.lua`：组合读取全部传感器和执行器
 - `client.lua`：对外提供简化调用接口
 
@@ -175,9 +175,11 @@
 
 - `scale` / `bias`：把控制命令映射到硬件输出
 - `outputMin` / `outputMax`：输出限幅
-- 误差累积量化：当输出不是整数时，用跨 tick 的抖动逼近小数平均值
+- 固定周期 PDM/PWM：当输出不是整数时，后台刷新循环按 `actuatorPwm.period` 在相邻整数之间切换，让长期平均值逼近小数目标
 
 例如输出 7.4 时，模块会在多个周期里按误差累积结果交替输出 7 和 8，让长期平均值接近 7.4。
+
+注意：小数输出需要持续运行 `run_altitude_experiment.lua`、`matlab_bridge.lua` 或 `collect_identification.lua` 这类带 PWM loop 的程序。单次 `set_actuator.lua` 退出后不会继续刷新小数占空序列。
 
 ## 前馈模型 `feedforward.lua`
 
@@ -378,6 +380,55 @@ read_io.lua
 read_io.lua 0.2
 test_sensors.lua
 ```
+
+### Simulink / MATLAB 透传 bridge
+
+当前 MATLAB 目录只保留 Simulink 可调用的 `.m` 透传层，不再维护旧的辨识、绘图、示波器脚本。链路为：
+
+```text
+Simulink / MATLAB -> cc_bridge_*.m -> bridge_host.py HTTP API
+-> matlab_bridge.lua WebSocket -> ComputerCraft io.lua / actuator.lua
+```
+
+PC 端先启动 bridge：
+
+```powershell
+python altitude_experiment/matlab/bridge_host.py --host 0.0.0.0 --port 8768 --token <token>
+```
+
+实验电脑运行：
+
+```lua
+matlab_bridge.lua ws://<FRP_HOST>:<FRP_PORT>/cc 0.2 TopThruster <token>
+```
+
+MATLAB 侧：
+
+```matlab
+addpath("D:\Work\Project\CC_Airship\altitude_experiment\matlab")
+baseUrl = "http://127.0.0.1:8768";
+token = getenv("CC_AIRSHIP_BRIDGE_TOKEN");
+alias = "TopThruster";
+
+y = cc_bridge_read(baseUrl, token, alias)
+ok = cc_bridge_write(7.5, baseUrl, token, alias)
+cc_bridge_stop(baseUrl, token, alias)
+```
+
+`cc_bridge_read` 返回固定数值列向量：
+
+```text
+[altitude; vertical_speed; actuator_output; connected; cc_t; ok]
+```
+
+Simulink 初期建议用 Interpreted MATLAB Function block：
+
+```matlab
+cc_bridge_read(baseUrl, token, alias)
+cc_bridge_write(u, baseUrl, token, alias)
+```
+
+如果用 MATLAB Function block，需要用 `coder.extrinsic` 调用透传函数，并预分配固定输出尺寸。
 
 ### 手动打执行器
 

@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.log
+
+altitude_experiment/matlab/*.csv
+altitude_experiment/matlab/*.mat
+altitude_experiment/matlab/data/
+altitude_experiment/matlab/*.slx.autosave
+altitude_experiment/matlab/identified_models.txt

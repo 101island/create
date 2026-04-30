@@ -22,7 +22,7 @@ CC_Airship 是一组 Lua 脚本，用于通过 `rednet` 在控制端、测速节
 | 目录 | 作用 | 主要文件 |
 | --- | --- | --- |
 | `control_hub/` | 从控制端向其他节点发送 RPC 消息，读取测速数据、GNSS 数据、显示测速数显、设置执行器转速，运行前行速度控制环和高度串级实验环。 | `config.lua`, `client.lua`, `display/`, `control_config.lua`, `pid.lua`, `rpc.lua`, `read_airspeed.lua`, `read_gnss.lua`, `monitor_airspeed.lua`, `display_dashboard.lua`, `show_flight_display.lua`, `send_actuator.lua`, `send_node.lua`, `run_forward_speed.lua`, `run_altitude_experiment.lua` |
-| `altitude_experiment/` | 高度串级实验电脑的独立部署目录。本机直接读取速度/高度并直接驱动本机推进器，不经过 `rednet`。 | `config.lua`, `client.lua`, `io.lua`, `airspeed.lua`, `gnss.lua`, `actuator.lua`, `control_config.lua`, `pid.lua`, `read_io.lua`, `set_actuator.lua`, `run_altitude_experiment.lua`, `README.txt` |
+| `altitude_experiment/` | 高度串级实验电脑的独立部署目录。本机直接读取速度/高度并直接驱动本机推进器，不经过 `rednet`；`matlab/` 内保存系统辨识和 PC bridge 脚本。 | `config.lua`, `client.lua`, `io.lua`, `actuator.lua`, `control_config.lua`, `pid.lua`, `data_logger.lua`, `collect_identification.lua`, `matlab_bridge.lua`, `read_io.lua`, `set_actuator.lua`, `run_altitude_experiment.lua`, `matlab/`, `README.txt` |
 | `airspeed_node/` | 监听测速请求，读取配置中定义的测速外设并返回速度值。 | `airspeed_node.lua`, `airspeed.lua`, `config.lua`, `rpc.lua` |
 | `gnss/` | 监听 GNSS 请求，读取 GPS 定位并返回 `x/y/z/altitude`。 | `gnss_node.lua`, `gnss.lua`, `config.lua`, `rpc.lua` |
 | `actuator_node/` | 监听执行器控制请求，调用外设的 `setSpeed`、`setGeneratedSpeed` 或 `stop` 方法。 | `actuator_node.lua`, `actuator.lua`, `rpc.lua`, `config.lua` |

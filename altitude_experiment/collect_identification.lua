@@ -17,6 +17,8 @@ local holdSeconds = tonumber(args[3]) or 5
 local cycles = tonumber(args[4]) or 6
 local period = tonumber(args[5]) or tonumber(controlCfg.period) or 0.2
 local logPath = args[6] or "altitude_id.csv"
+local pattern = args[7] or "step"
+local seed = tonumber(args[8]) or 12345
 
 local function clamp(value, minValue, maxValue)
     if minValue ~= nil and value < minValue then
@@ -54,8 +56,9 @@ else
 end
 
 if baseLevel == nil or period <= 0 or holdSeconds <= 0 or cycles <= 0 then
-    print("Usage: collect_identification.lua [base|auto] [amplitude] [holdSeconds] [cycles] [period] [logPath]")
-    print("Example: collect_identification.lua auto 1 5 6 0.2 altitude_id.csv")
+    print("Usage: collect_identification.lua [base|auto] [amplitude] [holdSeconds] [cycles] [period] [logPath] [pattern] [seed]")
+    print("Patterns: step, prbs, three")
+    print("Example: collect_identification.lua auto 1 5 12 0.2 altitude_id.csv prbs 12345")
     return
 end
 
@@ -111,11 +114,11 @@ local function buildRuntime(commandLevel, actualOutput, sensors, status)
     }
 end
 
-local function sample(commandLevel)
+local function sample(commandLevel, tag)
     local result, err = actuator.setOutput(cfg, alias, commandLevel)
     local _, sensors = readAltitude()
-    local actualOutput = result and result.output or nil
-    local status = err or "ok"
+    local actualOutput = result and (result.exactOutput or result.output) or nil
+    local status = err or ("ok:" .. tostring(tag or pattern))
 
     dataLogger.write(logger, buildRuntime(commandLevel, actualOutput, sensors, status))
 
@@ -128,18 +131,63 @@ local function sample(commandLevel)
     )
 end
 
+local function nextRandomBit()
+    seed = (seed * 1103515245 + 12345) % 2147483648
+    return seed % 2
+end
+
+local function commandForCycle(cycle)
+    if pattern == "prbs" then
+        if nextRandomBit() == 0 then
+            return lowLevel, "low"
+        end
+        return highLevel, "high"
+    end
+
+    if pattern == "three" then
+        local index = ((cycle - 1) % 3) + 1
+        if index == 1 then
+            return highLevel, "high"
+        elseif index == 2 then
+            return baseLevel, "base"
+        end
+        return lowLevel, "low"
+    end
+
+    if cycle % 2 == 1 then
+        return highLevel, "high"
+    end
+    return lowLevel, "low"
+end
+
 print("Identification collection")
 print("base=" .. tostring(baseLevel) .. " low=" .. tostring(lowLevel) .. " high=" .. tostring(highLevel))
 print("hold=" .. tostring(holdSeconds) .. "s cycles=" .. tostring(cycles) .. " period=" .. tostring(period))
 print("log=" .. tostring(logPath))
+print("pattern=" .. tostring(pattern) .. " seed=" .. tostring(seed))
 
-for cycle = 1, cycles do
-    local commandLevel = cycle % 2 == 1 and highLevel or lowLevel
-    for _ = 1, stepsPerHold do
-        sample(commandLevel)
-        sleep(period)
+local function collectLoop()
+    for cycle = 1, cycles do
+        local commandLevel, label = commandForCycle(cycle)
+        print("cycle=" .. tostring(cycle) .. " level=" .. tostring(label) .. " command=" .. tostring(commandLevel))
+        for _ = 1, stepsPerHold do
+            sample(commandLevel, pattern .. ":" .. label)
+            sleep(period)
+        end
     end
+
+    actuator.setOutput(cfg, alias, baseLevel)
+    actuator.update(cfg, alias, true)
+    print("Done. Output returned to base=" .. tostring(baseLevel))
 end
 
-actuator.setOutput(cfg, alias, baseLevel)
-print("Done. Output returned to base=" .. tostring(baseLevel))
+local function pwmLoop()
+    actuator.runPwm(cfg)
+end
+
+if type(parallel) == "table" and type(parallel.waitForAny) == "function" then
+    parallel.waitForAny(collectLoop, pwmLoop)
+else
+    print("WARN: parallel.waitForAny is unavailable; fractional actuator PWM will not refresh independently.")
+    collectLoop()
+end
